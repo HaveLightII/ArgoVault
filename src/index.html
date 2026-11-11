@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>PyPasswords</title>
+<title>ArgoVault</title>
 <style>
 :root{--bg:#e8ecef;--sf:#fbfcfd;--sf2:#eef1f4;--tx:#16212b;--mu:#637080;--ac:#234e70;--on:#fff;--br:#b4852c;--dg:#b3382c;--bd:#cfd6dc;--ok:#2f7d57;--ld:#234e70;--dgt:#9a3b8e;--sy:#b4852c;
 --sans:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;--serif:"Iowan Old Style","Noto Serif TC","Songti TC",Georgia,serif;--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
@@ -112,7 +112,7 @@ input,textarea,select,.hash{-webkit-user-select:text;user-select:text}
 </head>
 <body>
 <header class="top">
- <div class="brand"><b>PyPasswords</b><span class="chip" id="prof" data-nt hidden></span></div>
+ <div class="brand"><b>ArgoVault</b><span class="chip" id="prof" data-nt hidden></span></div>
  <div class="acts"><button class="btn" id="bGen">生成密碼</button><button class="btn" id="bSet">設定</button><button class="btn pri" id="bLock" hidden>鎖定</button></div>
 </header>
 <main>
@@ -125,6 +125,7 @@ input,textarea,select,.hash{-webkit-user-select:text;user-select:text}
    <label for="uSel">設定檔</label><select id="uSel" data-nt></select>
    <label for="uPw">主碼</label><input id="uPw" type="password" autocomplete="off" enterkeyhint="go">
    <button class="btn pri full" id="bUnlock">解鎖</button>
+   <button class="btn gh full" id="bBio" type="button" hidden>生物辨識解鎖</button>
    <div class="alt"><button class="btn gh mini" id="bImpG">從備份匯入</button><button class="btn dg mini" id="bDelG">刪除此設定檔</button></div>
   </div>
   <div id="pC" hidden>
@@ -146,7 +147,7 @@ input,textarea,select,.hash{-webkit-user-select:text;user-select:text}
   <ul id="ul" data-nt></ul>
   <div class="foot"><span id="cnt" data-nt></span>
    <details class="more"><summary>更多</summary><div>
-    <button id="bExp">匯出備份</button><button id="bImp">匯入備份</button><button id="bCsv">匯入 CSV</button><button id="bConv">轉換加密格式</button><button id="bPw">變更主碼</button><button id="bMulti">多選刪除</button><button id="bDel" style="color:var(--dg)">刪除資料庫</button>
+    <button id="bExp">匯出備份</button><button id="bImp">匯入備份</button><button id="bCsv">匯入 CSV</button><button id="bConv">轉換加密格式</button><button id="bPw">變更主碼</button><button id="bBioOn" data-nt hidden></button><button id="bMulti">多選刪除</button><button id="bDel" style="color:var(--dg)">刪除資料庫</button>
    </div></details></div>
  </aside>
  <article class="detail" id="dt" data-nt></article>
@@ -369,14 +370,14 @@ const WEAK=new Set(["password","123456","12345678","qwerty","111111","123456789"
 let S=null,idle,revT,edT,hidT,clipTimer=null,pend=null;
 
 /* ---------- 設定 ---------- */
-const DEF={lang:"",fmt:"PWV3",auto:false,weak:true,secure:false,pin:null,idle:5,bg:60,rev:30,len:20,clip:true};
+const DEF={lang:"",fmt:"PWV3",auto:false,weak:true,secure:false,pin:null,idle:5,bg:60,rev:30,len:20,clip:true,reauth:true};
 let cfg={...DEF};
 const FMTID={PWV3:"PWV3",PWV2:"PWV2",FERNET:"PWV1"};
 function cfgClean(){
  const pick=(v,a,d)=>a.includes(v)?v:d;
  cfg.lang=pick(cfg.lang,["","zh","en"],"");
  cfg.fmt=pick(cfg.fmt,["PWV3","PWV2","FERNET"],"PWV3");
- cfg.auto=!!cfg.auto;cfg.weak=cfg.weak!==false;cfg.secure=!!cfg.secure;cfg.clip=cfg.clip!==false;
+ cfg.auto=!!cfg.auto;cfg.weak=cfg.weak!==false;cfg.secure=!!cfg.secure;cfg.clip=cfg.clip!==false;cfg.reauth=cfg.reauth!==false;
  cfg.idle=pick(+cfg.idle,[1,3,5,10,30],5);cfg.bg=pick(+cfg.bg,[30,60,300,900],60);cfg.rev=pick(+cfg.rev,[15,30,60],30);
  cfg.len=Math.min(64,Math.max(12,Math.round(+cfg.len)||20));
  const p=cfg.pin;cfg.pin=p&&typeof p.s==="string"&&typeof p.h==="string"&&Number.isInteger(p.i)?p:null;
@@ -411,6 +412,25 @@ async function cfgSave(){
 const autoLang=()=>/^zh/i.test(navigator.language||"")?"zh":"en";
 let L=autoLang();
 const EN={
+"生物辨識解鎖":"Biometric unlock",
+"改用主碼":"Use master password",
+"啟用生物辨識解鎖":"Enable biometric unlock",
+"停用生物辨識解鎖":"Disable biometric unlock",
+"更新生物辨識解鎖":"Update biometric unlock",
+"啟用生物辨識解鎖需要驗證主碼":"Enabling biometric unlock requires the master password",
+"停用「{n}」的生物辨識解鎖嗎？之後須以主碼解鎖。":"Disable biometric unlock for \"{n}\"? You will need the master password to unlock.",
+"已啟用生物辨識解鎖":"Biometric unlock enabled",
+"已停用生物辨識解鎖":"Biometric unlock disabled",
+"已更新生物辨識解鎖":"Biometric unlock updated",
+"生物辨識解鎖已停用，可稍後在「更多」重新啟用":"Biometric unlock was disabled; you can enable it again later under More",
+"此裝置無法使用強生物辨識（需要已登錄的指紋或同等級的生物辨識）":"Strong biometrics are unavailable on this device (an enrolled fingerprint or an equivalent Class 3 biometric is required)",
+"生物辨識失敗：{c}":"Biometric authentication failed: {c}",
+"嘗試次數過多，生物辨識已暫時鎖定，請改用主碼":"Too many attempts; biometrics are temporarily locked. Use the master password",
+"生物辨識資料已變更或已失效，請以主碼解鎖後重新啟用":"Biometric data changed or is no longer valid. Unlock with the master password and enable it again",
+"生物辨識解鎖已停用（主碼可能已變更），請以主碼解鎖後重新啟用":"Biometric unlock was disabled (the master password may have changed). Unlock with the master password and enable it again",
+"查看密碼前需再次輸入主碼":"Ask for the master password again before revealing a password",
+"關閉後，解鎖時衍生的金鑰（不可匯出的 CryptoKey）會保留在記憶體直到鎖定，查看密碼不再詢問主碼。新增、編輯、刪除、匯入 CSV、變更主碼與轉換格式仍須輸入主碼。":"When off, the key derived at unlock (a non-extractable CryptoKey) stays in memory until the vault locks, and revealing a password no longer asks for the master password. Adding, editing, deleting, importing CSV, changing the master password and converting the format still require it.",
+"解密中…":"Decrypting…",
 "PWV1（PBKDF2 + AES-128-CBC + HMAC，Fernet 格式）":"PWV1 (PBKDF2 + AES-128-CBC + HMAC, Fernet format)",
 "PWV1（PBKDF2 + AES-128-CBC + HMAC-SHA256，Fernet 格式）":"PWV1 (PBKDF2 + AES-128-CBC + HMAC-SHA256, Fernet format)",
 "PWV2（PBKDF2-HMAC-SHA256 + AES-256-GCM）":"PWV2 (PBKDF2-HMAC-SHA256 + AES-256-GCM)",
@@ -661,9 +681,22 @@ function ask(reason){return new Promise(res=>{
  i.onkeydown=e=>{if(isEnter(e)){e.preventDefault();$("#aOk").click()}};
  d.onclose=()=>{if(!d.open)res(null)};d.showModal();i.focus();
 })}
-async function authOpen(reason){
+async function authOpen(reason,soft){
+ if(soft&&!cfg.reauth&&S&&S.ses){
+  const s0=S.ses,o=await work(t("解密中…"),async()=>{
+   const h=hdr(rawVault());
+   if(h.fmt!==s0.fmt||hex(h.salt)!==hex(s0.salt))return null;
+   try{return{fmt:h.fmt,salt:h.salt,keys:s0.keys,recs:await unseal(h.fmt,s0.keys,h.body)}}catch{return null}
+  });
+  if(o)return o;
+  if(S)S.ses=null;
+ }
  const pw=await ask(reason);if(!pw)return null;
- try{return await work(t("驗證主碼中…"),()=>openVault(rawVault(),pw))}finally{pw.fill(0)}
+ try{
+  const o=await work(t("驗證主碼中…"),()=>openVault(rawVault(),pw));
+  if(o&&S&&!cfg.reauth)S.ses={fmt:o.fmt,salt:o.salt,keys:o.keys};
+  return o;
+ }finally{pw.fill(0)}
 }
 const drop=o=>{if(o){o.recs=null;o.keys=null}};
 async function commit(o,recs){await storePut(S.profile,await seal(o.fmt,o.salt,o.keys,recs));S.meta=metaOf(recs)}
@@ -675,10 +708,10 @@ function refreshGate(){
  if(p.includes(cur))$("#uSel").value=cur;
  tab(p.length?"U":"C");
 }
-function tab(k){document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("on",b.dataset.t===k));$("#pU").hidden=k!=="U";$("#pC").hidden=k!=="C"}
+function tab(k){document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("on",b.dataset.t===k));$("#pU").hidden=k!=="U";$("#pC").hidden=k!=="C";refreshBio()}
 function enter(){
  $("#gate").hidden=true;$("#vault").hidden=false;$("#bLock").hidden=false;
- $("#prof").hidden=false;$("#prof").textContent=S.profile;$("#q").value="";render();armIdle();
+ $("#prof").hidden=false;$("#prof").textContent=S.profile;$("#q").value="";render();armIdle();refreshBio();
 }
 function lock(){
  stopRev();clearTimeout(edT);clearTimeout(idle);clearTimeout(hidT);clipClear();S=null;pend=null;
@@ -745,27 +778,75 @@ $("#uPw").addEventListener("keydown",e=>{if(isEnter(e)){e.preventDefault();$("#b
 $("#cPw2").addEventListener("keydown",e=>{if(isEnter(e)){e.preventDefault();$("#bCreate").click()}});
 $("#pwNew2").addEventListener("keydown",e=>{if(isEnter(e)){e.preventDefault();$("#pwOk").click()}});
 $("#iName").addEventListener("keydown",e=>{if(isEnter(e)){e.preventDefault();if(!$("#iOk").disabled)$("#iOk").click()}});
-$("#bUnlock").onclick=async()=>{
- const name=$("#uSel").value;if(!name)return toast("尚無設定檔，請先建立",1);
- const pw=enc.encode($("#uPw").value);$("#uPw").value="";if(!pw.length)return;
+/* ---------- 生物辨識（Android 橋接 PwBio；其他平台沒有此物件，相關按鈕不會出現） ---------- */
+const bioApi=window.PwBio||null,bioCbs={},BIO_MSG="此裝置無法使用強生物辨識（需要已登錄的指紋或同等級的生物辨識）";let bioSeq=0;
+window.__pwBioDone=(id,code,data)=>{const f=bioCbs[id];delete bioCbs[id];if(f)f({code,data})};
+const bioCall=(fn,...a)=>new Promise(res=>{const id=String(++bioSeq);bioCbs[id]=res;try{bioApi[fn](...a,id)}catch(e){delete bioCbs[id];res({code:"error",data:String(e&&e.message||e)})}});
+const bioStatus=()=>{try{return bioApi?String(bioApi.status()):"none"}catch{return"none"}};
+const bioHas=n=>{try{return !!bioApi&&!!n&&!!bioApi.has(n)}catch{return false}};
+const bioRemove=n=>{try{if(bioApi&&n)bioApi.remove(n)}catch{}};
+function refreshBio(){
+ const sel=$("#uSel").value;
+ $("#bBio").hidden=!(bioApi&&sel&&!$("#pU").hidden&&bioHas(sel));
+ const b=$("#bBioOn");b.hidden=!bioApi||!S;
+ if(S)b.textContent=t(bioHas(S.profile)?"停用生物辨識解鎖":"啟用生物辨識解鎖");
+}
+async function bioRenew(name,pw){
+ bioRemove(name);
+ if(bioStatus()==="ok"){const r=await bioCall("enroll",name,b64(pw),t("更新生物辨識解鎖"),t("取消"));if(r.code==="ok")return toast("已更新生物辨識解鎖")}
+ toast("生物辨識解鎖已停用，可稍後在「更多」重新啟用",1);
+}
+async function doUnlock(name,pw,fromBio){
  try{
   const raw=storeGet(name),o=await work(t("解鎖中…"),()=>openVault(raw,pw));
+  if(!o&&fromBio){bioRemove(name);refreshBio();toast("生物辨識解鎖已停用（主碼可能已變更），請以主碼解鎖後重新啟用",1)}
   if(o){
-   let note=null;
+   let note=null,ses={fmt:o.fmt,salt:o.salt,keys:o.keys};
    if(cfg.auto&&o.fmt!==cfg.fmt){
     const to=cfg.fmt;
     const ok=await work(t("轉換格式中…"),async()=>{
      const salt=rb(16),k=await derive(to,pw,salt),out=await seal(to,salt,k,o.recs);
      const back=await unseal(to,k,hdr(out).body);
      if(JSON.stringify(back)!==JSON.stringify(o.recs))throw new Error("轉換驗證失敗，原資料未變更");
-     await storePut(name,out);return true;
+     await storePut(name,out);ses={fmt:to,salt,keys:k};return true;
     });
     if(ok)note=t("已自動轉換為 {f}",{f:FMTID[to]});
    }
-   S={profile:name,meta:metaOf(o.recs),sel:null,mode:"view",rev:null,ed:null,multi:null};drop(o);enter();
+   S={profile:name,meta:metaOf(o.recs),sel:null,mode:"view",rev:null,ed:null,multi:null,ses:cfg.reauth?null:ses};drop(o);enter();
    if(note)toast(note);
   }
  }finally{pw.fill(0)}
+}
+$("#bUnlock").onclick=()=>{
+ const name=$("#uSel").value;if(!name)return toast("尚無設定檔，請先建立",1);
+ const pw=enc.encode($("#uPw").value);$("#uPw").value="";if(!pw.length)return;
+ return doUnlock(name,pw,false);
+};
+$("#bBio").onclick=async()=>{
+ const name=$("#uSel").value;if(!name||!bioHas(name))return refreshBio();
+ if(bioStatus()!=="ok")return toast(BIO_MSG,1);
+ const r=await bioCall("unlock",name,t("生物辨識解鎖"),t("改用主碼"));
+ if(r.code==="ok")return doUnlock(name,unb64(r.data),true);
+ if(r.code==="cancel")return;
+ if(r.code==="invalidated"||r.code==="missing"){bioRemove(name);refreshBio();return toast("生物辨識資料已變更或已失效，請以主碼解鎖後重新啟用",1)}
+ if(r.code==="lockout")return toast("嘗試次數過多，生物辨識已暫時鎖定，請改用主碼",1);
+ toast(t("生物辨識失敗：{c}",{c:r.data||r.code}),1);
+};
+$("#uSel").addEventListener("change",refreshBio);
+$("#bBioOn").onclick=async()=>{
+ $(".more").open=false;if(!S||!bioApi)return;
+ const name=S.profile;
+ if(bioHas(name)){
+  if(await askYesNo(t("停用「{n}」的生物辨識解鎖嗎？之後須以主碼解鎖。",{n:name}))){bioRemove(name);refreshBio();toast("已停用生物辨識解鎖")}
+  return;
+ }
+ if(bioStatus()!=="ok")return toast(BIO_MSG,1);
+ const pw=await ask(t("啟用生物辨識解鎖需要驗證主碼"));if(!pw)return;
+ try{
+  const o=await work(t("驗證主碼中…"),()=>openVault(rawVault(),pw));if(!o)return;drop(o);
+  const r=await bioCall("enroll",name,b64(pw),t("啟用生物辨識解鎖"),t("取消"));
+  if(r.code==="ok")toast("已啟用生物辨識解鎖");else if(r.code!=="cancel")toast(t("生物辨識失敗：{c}",{c:r.data||r.code}),1);
+ }finally{pw.fill(0);refreshBio()}
 };
 $("#bCreate").onclick=async()=>{
  const name=$("#cName").value.trim(),p1=$("#cPw").value,p2=$("#cPw2").value;
@@ -777,7 +858,7 @@ $("#bCreate").onclick=async()=>{
  const pw=enc.encode(p1),fmt=$("#cFmt").value,salt=rb(16);["#cPw","#cPw2"].forEach(s=>$(s).value="");
  try{
   const ok=await work(t("建立中…"),async()=>{const k=await derive(fmt,pw,salt);await storePut(name,await seal(fmt,salt,k,[]));return true});
-  if(ok){$("#cName").value="";S={profile:name,meta:[],sel:null,mode:"view",rev:null,ed:null,multi:null};enter();toast("設定檔已建立")}
+  if(ok){bioRemove(name);$("#cName").value="";S={profile:name,meta:[],sel:null,mode:"view",rev:null,ed:null,multi:null};enter();toast("設定檔已建立")}
  }finally{pw.fill(0)}
 };
 $("#q").oninput=renderList;
@@ -801,7 +882,7 @@ $("#dt").onclick=async e=>{
  else if(a==="hide")hideRev();
  else if(a==="back"){stopRev();S.sel=null;render()}
  else if(a==="rev"){
-  const m=S.meta.find(x=>x.id===S.sel),o=await authOpen(t("查看「{n}」的密碼需要驗證主碼",{n:m.accountName}));if(!o)return;
+  const m=S.meta.find(x=>x.id===S.sel),o=await authOpen(t("查看「{n}」的密碼需要驗證主碼",{n:m.accountName}),true);if(!o)return;
   const rec=o.recs.find(x=>x.id===m.id);drop(o);if(!rec)return toast("找不到該紀錄",1);
   stopRev();S.rev={id:m.id,rec,t:cfg.rev};
   revT=setInterval(()=>{if(!S||!S.rev)return stopRev();if(--S.rev.t<=0)hideRev();else{const c=$("#cd");if(c)c.textContent=S.rev.t}},1000);
@@ -907,7 +988,7 @@ $("#iOk").onclick=async()=>{
  if(storeGet(name)&&!await askYesNo(t("匯入將覆蓋同名設定檔現有資料庫，是否繼續？")))return;
  if(!pend)return er("匯入資料已失效，請重新選擇檔案");
  try{await storePut(name,pend)}catch(e){return er(e.message||String(e))}
- pend=null;$("#dlgImp").close();
+ pend=null;bioRemove(name);$("#dlgImp").close();
  if(S)lock();refreshGate();$("#uSel").value=name;toast("匯入完成，請輸入主碼解鎖");
 };
 async function delDb(name){
@@ -916,7 +997,7 @@ async function delDb(name){
  if(a===null)return;
  if(a.trim()!==name)return toast("名稱不符，已取消",1);
  if(!await pinGate(t("請輸入刪除用 PIN")))return;
- await storeDel(name);if(S)lock();else refreshGate();toast(t("已刪除設定檔「{n}」",{n:name}));
+ await storeDel(name);bioRemove(name);if(S)lock();else refreshGate();toast(t("已刪除設定檔「{n}」",{n:name}));
 }
 $("#bDel").onclick=()=>{$(".more").open=false;delDb(S.profile)};
 $("#bDelG").onclick=()=>delDb($("#uSel").value);
@@ -965,7 +1046,7 @@ $("#cvOk").onclick=async()=>{
    if(JSON.stringify(back)!==JSON.stringify(o.recs))throw new Error("轉換驗證失敗，原資料未變更");
    await storePut(S.profile,out);drop(o);return true;
   });
-  if(ok)toast(t("已轉換為 {f}",{f:fmtName(fmt)}));
+  if(ok){if(S)S.ses=null;toast(t("已轉換為 {f}",{f:fmtName(fmt)}))}
  }finally{pw.fill(0)}
 };
 
@@ -993,7 +1074,7 @@ $("#pwOk").onclick=async()=>{
    if(JSON.stringify(back)!==JSON.stringify(o.recs))throw new Error("轉換驗證失敗，原資料未變更");
    await storePut(S.profile,out);drop(o);return true;
   });
-  if(ok)toast("主碼已變更，請記得更新備份");
+  if(ok){if(S)S.ses=null;toast("主碼已變更，請記得更新備份");if(S&&bioHas(S.profile))await bioRenew(S.profile,newPw)}
   else if(S){$("#dlgPw").showModal();$("#pwOld").focus()}
  }finally{oldPw.fill(0);newPw.fill(0)}
 };
@@ -1026,6 +1107,8 @@ function renderSet(){
  <label for="sBg">${t("切到背景後鎖定")}</label><select id="sBg">${bgs}</select>
  <p class="hint">${t("匯出、匯入時的系統檔案對話框也算背景，時間太短可能中途被鎖定。")}</p>
  <label for="sRev">${t("查看密碼顯示時間")}</label><select id="sRev">${revs}</select>
+ ${chk("sReauth",cfg.reauth,t("查看密碼前需再次輸入主碼"))}
+ <p class="hint">${t("關閉後，解鎖時衍生的金鑰（不可匯出的 CryptoKey）會保留在記憶體直到鎖定，查看密碼不再詢問主碼。新增、編輯、刪除、匯入 CSV、變更主碼與轉換格式仍須輸入主碼。")}</p>
  ${chk("sClip",cfg.clip,t("複製密碼後提醒我清除剪貼簿"))}
  <label>${t("刪除用 PIN")}</label>
  <div class="pinrow"><span>${t(cfg.pin?"目前狀態：已設定":"目前狀態：未設定")}</span><span class="sp"></span><button class="btn mini" id="bPinSet" type="button">${t(cfg.pin?"變更 PIN":"設定 PIN")}</button>${cfg.pin?`<button class="btn mini dg" id="bPinClr" type="button">${t("移除 PIN")}</button>`:""}</div>
@@ -1036,7 +1119,7 @@ $("#bSet").onclick=()=>{renderSet();$("#dlgSet").showModal()};
 $("#dlgSet").addEventListener("input",e=>{if(e.target.id==="sLen")$("#sLenN").textContent=e.target.value});
 $("#dlgSet").addEventListener("change",async e=>{
  const el=e.target,id=el.id;
- if(id==="sLang"){cfg.lang=el.value;await cfgSave();applyLang();return}
+ if(id==="sLang"){cfg.lang=el.value;await cfgSave();applyLang();refreshBio();return}
  if(id==="sFmt"){cfg.fmt=el.value;$("#cFmt").value=cfg.fmt}
  else if(id==="sAuto")cfg.auto=el.checked;
  else if(id==="sWeak")cfg.weak=el.checked;
@@ -1045,6 +1128,7 @@ $("#dlgSet").addEventListener("change",async e=>{
  else if(id==="sIdle"){cfg.idle=+el.value;armIdle()}
  else if(id==="sBg")cfg.bg=+el.value;
  else if(id==="sRev")cfg.rev=+el.value;
+ else if(id==="sReauth"){cfg.reauth=el.checked;if(cfg.reauth&&S)S.ses=null}
  else if(id==="sClip")cfg.clip=el.checked;
  else return;
  await cfgSave();
@@ -1068,7 +1152,7 @@ $("#dlgSet").addEventListener("click",async e=>{
  else if(id==="sReset"){
   if(cfg.pin&&!await pinGate(t("輸入目前的 PIN")))return;
   if(!await askYesNo(t("還原預設值會一併移除 PIN，仍要繼續嗎？")))return;
-  const lang=cfg.lang;cfg={...DEF,lang};await cfgSave();$("#cFmt").value=cfg.fmt;renderSet();toast("已還原預設值");
+  const lang=cfg.lang;cfg={...DEF,lang};if(S)S.ses=null;await cfgSave();$("#cFmt").value=cfg.fmt;renderSet();toast("已還原預設值");
  }
 });
 
