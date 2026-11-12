@@ -1,4 +1,6 @@
-# PyPasswords HTML 版交接文件
+# ArgoVault HTML 版交接文件
+
+專案已於 2026-11-11 改名為 ArgoVault（原名 PyPasswords），見第 11 節。以下除第 11 節外，名稱已一併更新。  
 
 ## 1. 專案概述
 
@@ -10,9 +12,9 @@
 
 | 檔案 | 用途 |
 | --- | --- |
-| `index.html` | 已含全部修改的完整前端，直接覆蓋 `~/PyPasswords/src/index.html`，不要再執行任何修補腳本 |
+| `index.html` | 已含全部修改的完整前端，直接覆蓋 `~/gits/ArgoVault/src/index.html`，不要再執行任何修補腳本 |
 | `MainActivity.kt` | Android 狀態列內縮、禁止截圖（`FLAG_SECURE`）、返回鍵攔截（呼叫 JS 的 `window.__pwBack`），覆蓋 `gen/android` 內同名檔案 |
-| `PyPasswords_HANDOFF.md` | 本文件 |
+| `ArgoVault_HANDOFF.md` | 本文件 |
 
 `patchPyPasswords.py` 與 `patchPyPasswords2.py` 已被 `index.html` 取代，只保留作歷史紀錄；`makeIcon.py` 仍可用於產生預設圖示。  
 
@@ -30,8 +32,9 @@
 - 使用者的建置主機已改為 macOS（見第 9 節），不再使用 Ubuntu。MacOS 的 `sed -i` 必須寫成 `sed -i ''`，且不支援 GNU 的 `0,/.../` 位址，需改用 `perl -0pi`。  
 - 使用者常直接貼上終端機輸出，回答前必須逐行核對輸出（例如曾貼出兩個路徑黏在一起的 `adb install` 指令、`strings.xml` 內字串帶引號），並指出實際發現的問題。  
 - 使用者簽署 APK 的實際做法是 `java -jar ~/bin/uber-apk-signer.jar -a <未簽署 APK>`（內嵌 debug 金鑰），不是 `zipalign` 加 `apksigner`；之後的指令以此為準。  
-- 使用者要求「更新 Handoff.md」時，交付完整更新後的 `PyPasswords_HANDOFF.md`，並用 `present_files` 提供。  
-- 使用者偶爾把專案路徑打成 `~/PyPassword`；實際路徑是 `~/PyPasswords`（有 s），遇到時直接指出並以正確路徑為準。  
+- 使用者要求「更新 Handoff.md」時，交付完整更新後的 `ArgoVault_HANDOFF.md`，並用 `present_files` 提供。  
+- 專案實際路徑為 `~/gits/ArgoVault`（改名前為 `~/gits/PyPasswords`）；使用者曾把舊路徑打成 `~/PyPassword`，遇到時直接指出並以正確路徑為準。  
+- 使用者的 GitHub 帳號為 `HaveLightII`（舊 README 曾寫 `user-7510`）。  
 
 ## 3. 原程式（PyPasswords.py）重點
 
@@ -71,6 +74,7 @@ CSV 匯入欄位：`帳戶類型,帳號名稱,密碼,連結帳戶,姓名,備註`
   - 多選刪除：進入後清單每列出現勾選框，上方出現操作列（已選數量、全選或取消全選目前搜尋結果、刪除所選、結束）；刪除前先確認再驗證主碼，一次寫入。  
   - 刪除資料庫：「更多」選單與鎖定畫面的「刪除此設定檔」皆提供，須輸入完整設定檔名稱；若已設定 PIN 再輸入 PIN。  
   - 匯入 CSV（規則同原程式）。  
+- 生物辨識解鎖（僅 Android，見 11.5）：「更多」選單的啟用或停用（每個設定檔各自）；解鎖頁在該設定檔已啟用時顯示「生物辨識解鎖」按鈕。無 `window.PwBio` 時（瀏覽器、macOS）兩個按鈕都隱藏。  
 - 設定（標題列的「設定」鈕，鎖定畫面也能開啟）：見 4.2。  
 - 儲存位置：Tauri 內為 `<AppData>/vault/<設定檔>.bin`（Android 的 AppData 實測就是 App 私有資料目錄的根，`run-as` 列出 `./vault/...`）；瀏覽器內為 `localStorage`，鍵為 `pwv:<profile>`，值為檔案位元組的 base64。  
 - 所有 `confirm` 與 `prompt` 改為自製 `<dialog id="dlgAsk">`（`askYesNo`、`askText`、`askPin`；PIN 輸入為遮罩加數字鍵盤）。  
@@ -93,6 +97,7 @@ CSV 匯入欄位：`帳戶類型,帳號名稱,密碼,連結帳戶,姓名,備註`
 | 閒置自動鎖定 | 5 分鐘 | 1、3、5、10、30 分鐘 |
 | 切到背景後鎖定 | 1 分鐘 | 30 秒、1、5、15 分鐘；刻意不提供「立即」，因為匯出入時的系統檔案對話框會讓 App 進入背景 |
 | 查看密碼顯示時間 | 30 秒 | 15、30、60 秒 |
+| 查看密碼前需再次輸入主碼 | 開 | 關閉時，解鎖後（或關閉後首次輸入主碼成功時）保留不可匯出的 `CryptoKey` 於記憶體，查看密碼不再詢問主碼；新增、編輯、刪除、匯入 CSV、變更主碼、轉換格式、刪除資料庫仍須主碼。鎖定、轉換格式、變更主碼、重新開啟此設定、還原預設值都會清除保留的金鑰 |
 | 複製密碼後提醒我清除剪貼簿 | 開 | 關閉時複製只顯示「已複製」 |
 | 刪除用 PIN | 未設定 | 適用於刪除資料庫、單筆刪除、多選刪除；4 至 8 位數字，以 PBKDF2-SHA256（100000 次，隨機 16 位元組 salt）雜湊後存入設定檔。變更、移除、還原預設都必須先輸入目前 PIN。PIN 不參與加密，只能防誤刪與旁人操作，無法保護資料；能取得設定檔或 App 資料的人可以直接刪檔 |
 
@@ -108,8 +113,8 @@ JS 無法直接設定 Android 視窗旗標，也沒有自訂外掛，所以採�
 
 ### 4.4 安全設計（使用者明確要求）
 
-- 解鎖後記憶體只保留清單中繼資料（`id`、`accountType`、`accountName`、`name`）。  
-- 查看密碼、編輯、新增、刪除、多選刪除、匯入 CSV、變更主碼、轉換格式，都要再輸入一次主碼。  
+- 解鎖後記憶體只保留清單中繼資料（`id`、`accountType`、`accountName`、`name`）。例外：關閉「查看密碼前需再次輸入主碼」時，另保留不可匯出的 `CryptoKey`（`S.ses`），見 4.2。  
+- 查看密碼、編輯、新增、刪除、多選刪除、匯入 CSV、變更主碼、轉換格式，都要再輸入一次主碼；其中只有「查看密碼」可依設定略過，其餘一律要求。  
 - 查看後自動隱藏並顯示倒數（時間見設定）；密碼預設遮罩，按「顯示」才露出。  
 - 編輯期間只保留不可匯出的 `CryptoKey`，儲存時以該金鑰重新解密儲存區最新資料後合併寫入；編輯表單閒置 120000 ms 自動取消。  
 - 主碼輸入後立即轉為 `Uint8Array` 並清空輸入框，用畢以 `fill(0)` 歸零；Argon2id 的輸入緩衝與 19 MiB 工作記憶體運算後清零（Worker 內的副本也會歸零，Worker 用完即 `terminate()`）。  
@@ -130,6 +135,8 @@ JS 無法直接設定 Android 視窗旗標，也沒有自訂外掛，所以採�
 - 新增任何使用者看得到的字串時，必須同時加進 `EN`；`toast()`、`work()` 的訊息與 `Error.message` 都會經過 `t()`。  
 - 儲存層：`tauriApi`、`vaultCache`、`storeInit`、`storeGet`、`storePut`、`storeDel`、`saveFile`、`askDlg`。`storeGet` 與 `rawVault` 為同步函式，依賴啟動時載入的 `vaultCache`，所以不可改成非同步。  
 - `askDlg` 與 `ask` 的 `onclose` 必須寫成 `if(!d.open)`：連續兩次使用同一個對話框時，前一次 `close()` 延後送出的 `close` 事件會落到下一次的處理函式，若不檢查 `d.open` 會把第二個提示誤判為取消（見第 6 節）。  
+- 重新驗證：`authOpen(reason, soft)`。`soft` 為真（目前只有查看密碼）、`cfg.reauth` 為假且 `S.ses`（`fmt`、`salt`、`keys`）存在時，直接以 `S.ses` 呼叫 `unseal`，不經 KDF；`S.ses` 與檔頭的 `fmt` 或 `salt` 不符、或解密失敗，就清除並退回詢問主碼。`S.ses` 的來源：解鎖時（自動轉換後改存新 salt 的金鑰），以及關閉設定後任一次輸入主碼成功的 `authOpen`。  
+- 生物辨識：`bioApi`（`window.PwBio`）、`bioCall`（以序號與 `window.__pwBioDone` 把原生回呼包成 Promise）、`bioStatus`、`bioHas`、`bioRemove`、`bioRenew`、`refreshBio`、`doUnlock(name, pw, fromBio)`（原 `#bUnlock` 的解鎖流程，主碼與生物辨識共用）。生物辨識解鎖若解密後無法開啟資料庫（主碼已變），自動停用該設定檔的註冊。建立同名設定檔、匯入覆蓋、刪除設定檔時也清除註冊。  
 - 其餘為介面與事件：`work`、`authOpen`、`commit`、`renderList`、`renderDetail`、`renderEdit`、`lock`、`importBackup`、`delDb`、`pinGate`、`parseCsv`、`window.__pwBack`（Android 返回鍵，見 4.7），以及檔尾的啟動區塊。  
 - 啟動區塊：註冊 `error` 與 `unhandledrejection` 的 toast；Tauri 內先顯示「載入設定檔中…」並停用解鎖鈕，設定與設定檔並行載入完成後才套用語言、同步旗標檔、呼叫 `refreshGate`，並在主控台輸出 `[PW] storeInit 完成：N 個設定檔，X ms`，可用 `adb logcat` 過濾 `[PW]` 查看耗時。  
 
@@ -189,7 +196,7 @@ Web Worker 效能實測（容器內 Chromium，同一組輸入，兩次）：主
 - 第一輪（套用第一支修補腳本後）：解鎖後切到主畫面再回來按鈕恢復運作；建立、新增、強制結束後重開紀錄仍在；`run-as` 列出 `./vault/測試.bin`、`測試.bin.bak`、`back1652.bin`；轉換格式、匯出（兩次儲存對話框）、匯入皆正常。  
 - 第二輪（套用 Enter、剪貼簿、命名、`MainActivity.kt` 與狀態列資源後）：Enter 全部正常；重開不再卡頓（但原因未確定，見第 6 節）；狀態列不再重疊。  
 - 第三輪（設定、語言、Worker、變更主碼、多選刪除、自動轉換、PIN、禁止截圖、禁止選取等）：使用者回報第 9.5 節清單測試結果皆為 OK；未逐項附上輸出，也未說明 `secure.flag` 路徑與最近工作畫面縮圖的細節。  
-- 第四輪（單筆刪除 PIN、返回鍵、自訂圖示、正式版 APK）：建置輸出顯示 `Finished 1 APK`，以 uber-apk-signer 簽署後 `adb install` 回報 `Success`，`MainActivity.kt` 含返回鍵已成功編譯；使用者回報「測試完成」，未逐項描述。改名（`PyPasswords`）的指令已提供，使用者貼出的檢查輸出顯示改名前 `productName`、視窗標題、`app_name`、`main_activity_title` 皆為小寫 `pypasswords`（`strings.xml` 內字串還帶有一對雙引號），改名後的結果尚未回報。  
+- 第四輪（單筆刪除 PIN、返回鍵、自訂圖示、正式版 APK）：建置輸出顯示 `Finished 1 APK`，以 uber-apk-signer 簽署後 `adb install` 回報 `Success`，`MainActivity.kt` 含返回鍵已成功編譯；使用者回報「測試完成」，未逐項描述。改名（`ArgoVault`）的指令已提供，使用者貼出的檢查輸出顯示改名前 `productName`、視窗標題、`app_name`、`main_activity_title` 皆為小寫 `pypasswords`（`strings.xml` 內字串還帶有一對雙引號），改名後的結果尚未回報。  
 
 未驗證：
 
@@ -265,7 +272,7 @@ node --check /home/claude/chk.js
 
 目標：以 Tauri 2 將 `index.html` 打包為 Android App，並已要求 macOS `.dmg` 的建置指令（尚未回報結果）。  
 
-建置主機：macOS（Apple Silicon，zsh），專案目錄 `~/PyPasswords`；舊的 Ubuntu 專案已改名為 `~/PyPasswords.old`，並從 Linux 機器取回其 `src/index.html`。這次是全新建立專案，沒有複製舊專案的 `gen/android`、`node_modules` 或 `target`。  
+建置主機：macOS（Apple Silicon，zsh），專案目錄 `~/gits/ArgoVault`；舊的 Ubuntu 專案已改名為 `~/PyPasswords.old`，並從 Linux 機器取回其 `src/index.html`。這次是全新建立專案，沒有複製舊專案的 `gen/android`、`node_modules` 或 `target`。  
 
 目前狀態：
 
@@ -275,7 +282,7 @@ node --check /home/claude/chk.js
 - 手機上目前安裝的版本：含全部功能的 `index.html`、含返回鍵的 `MainActivity.kt`、自訂圖示，以及以 uber-apk-signer（debug 金鑰）簽署的 release APK `app-universal-release-aligned-debugSigned.apk`；使用者回報測試完成。  
 - 兩個交付檔案已放入專案並建置安裝（見第 5 節第三輪與第四輪）。  
 - Kotlin 編譯已通過：輸出只有 Tauri 與 `WryActivity.kt`、`RustWebView.kt` 的棄用警告，另有 AGP 對 `gradle.properties` 選項的棄用警告，皆可忽略。  
-- 輸出路徑：debug 版為 `~/PyPasswords/src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk`；release 版為 `.../apk/universal/release/app-universal-release-unsigned.apk`，經 uber-apk-signer 後產生 `.../release/app-universal-release-aligned-debugSigned.apk`。  
+- 輸出路徑：debug 版為 `~/gits/ArgoVault/src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk`；release 版為 `.../apk/universal/release/app-universal-release-unsigned.apk`，經 uber-apk-signer 後產生 `.../release/app-universal-release-aligned-debugSigned.apk`。  
 
 實際建置環境（取自使用者貼出的輸出）：
 
@@ -307,10 +314,10 @@ node --check /home/claude/chk.js
 | 禁止截圖 | JS 寫 `<AppData>/secure.flag`，`MainActivity.kt` 以 `FileObserver` 監看並設定 `FLAG_SECURE` | 不另寫 Tauri Kotlin 外掛與 Rust 指令；不依賴未查證的 WebView 掛鉤 API |
 | Argon2id | 以 Blob Worker 執行，失敗退回主執行緒 | 實測總時間不變，但運算期間畫面不再凍結 |
 | 圖示 | `app-icon.png`（1024×1024、透明背景、主體在中央約 66% 內）；`tauri icon app-icon.png --ios-color "#234e70"`，此色碼同時寫入 Android 的背景色檔案 | 行動圖示直接寫入 `gen/android`，須先有該專案 |
-| 自訂圖示 | 來源 `~/icon.png` 以 Pillow 縮放置中到 1024×1024 透明畫布（最長邊 680 像素），存成 `~/PyPasswords/app-icon.png` 後執行 `tauri icon` | Android 自適應圖示會被遮罩裁切，主體須在中央約三分之二內；同一次也產生 `.icns` 與 `.ico` |
+| 自訂圖示 | 來源 `~/icon.png` 以 Pillow 縮放置中到 1024×1024 透明畫布（最長邊 680 像素），存成 `~/gits/ArgoVault/app-icon.png` 後執行 `tauri icon` | Android 自適應圖示會被遮罩裁切，主體須在中央約三分之二內；同一次也產生 `.icns` 與 `.ico` |
 | 返回鍵 | `MainActivity.kt` 以 `OnBackPressedCallback` 攔截，`evaluateJavascript` 呼叫 `window.__pwBack`；結果非 `"true"` 就 `finish()` | JS 端才知道目前有哪些對話框與畫面層級；用檢視樹找 `WebView`，不依賴 Tauri 內部欄位 |
 | 正式版簽署（現況） | 以 uber-apk-signer 對 `app-universal-release-unsigned.apk` 對齊並以內嵌 debug 金鑰簽署 | 可覆蓋安裝 debug 版而不清資料；不是正式金鑰，未來換成自有金鑰須先匯出備份並解除安裝 |
-| 應用程式名稱 | `productName`、視窗標題、`strings.xml` 的 `app_name` 與 `main_activity_title` 改為 `PyPasswords`；`identifier` 不變 | 資料目錄依 `identifier`，改名不影響 vault 與設定；指令見 9.3.2，結果尚未回報 |
+| 應用程式名稱 | `productName`、視窗標題、`strings.xml` 的 `app_name` 與 `main_activity_title` 改為 `ArgoVault`；`identifier` 不變 | 資料目錄依 `identifier`，改名不影響 vault 與設定；指令見 9.3.2，結果尚未回報 |
 
 固定事項：`identifier` 定案後不可更動；不更動 `useHttpsScheme`；`src-tauri/gen/android` 納入版本控制。  
 
@@ -329,9 +336,9 @@ export PATH="$PATH:$ANDROID_HOME/platform-tools"
 
 ```
 cd ~
-[ -e ~/PyPasswords ] && mv ~/PyPasswords ~/PyPasswords.old
-npm create tauri-app@latest PyPasswords -- -m npm -t vanilla --identifier com.havelight.pypasswords -y
-cd ~/PyPasswords
+[ -e ~/gits/ArgoVault ] && mv ~/gits/ArgoVault ~/PyPasswords.old
+npm create tauri-app@latest ArgoVault -- -m npm -t vanilla --identifier com.havelight.pypasswords -y
+cd ~/gits/ArgoVault
 npm install
 npm run tauri add fs
 npm run tauri add dialog
@@ -369,12 +376,12 @@ cp ~/Downloads/MainActivity.kt $(find src-tauri/gen/android -name MainActivity.k
 狀態列背景色資源（只需執行一次；若 `themes.xml` 已含 `pw_window_bg` 則不會重複寫入）：
 
 ```
-cd ~/PyPasswords/src-tauri/gen/android/app/src/main/res
+cd ~/gits/ArgoVault/src-tauri/gen/android/app/src/main/res
 mkdir -p values values-night
 printf '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="pw_window_bg">#FBFCFD</color>\n</resources>\n' > values/pw_colors.xml
 printf '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="pw_window_bg">#151D25</color>\n</resources>\n' > values-night/pw_colors.xml
 for f in $(find . -name themes.xml); do grep -q pw_window_bg "$f" || perl -0pi -e 's|</style>|    <item name="android:windowBackground">\@color/pw_window_bg</item>\n  </style>|' "$f"; done
-cd ~/PyPasswords
+cd ~/gits/ArgoVault
 ```
 
 建置與安裝：
@@ -407,8 +414,8 @@ npm run tauri android build -- --apk --target aarch64
 apk=$(find src-tauri/gen/android -name '*unsigned.apk' | head -1)
 bt=$HOME/Android/Sdk/build-tools/$(ls $HOME/Android/Sdk/build-tools | sort -V | tail -1)
 $bt/zipalign -v -p 4 "$apk" /tmp/pypasswords-aligned.apk
-$bt/apksigner sign --ks ~/upload-keystore.jks --ks-key-alias upload --out ~/PyPasswords/PyPasswords-release.apk /tmp/pypasswords-aligned.apk
-$bt/apksigner verify ~/PyPasswords/PyPasswords-release.apk
+$bt/apksigner sign --ks ~/upload-keystore.jks --ks-key-alias upload --out ~/gits/ArgoVault/ArgoVault-release.apk /tmp/pypasswords-aligned.apk
+$bt/apksigner verify ~/gits/ArgoVault/ArgoVault-release.apk
 ```
 
 金鑰遺失即無法原地更新，只能解除安裝而清空 vault，須備份 `~/upload-keystore.jks` 與其密碼，並先匯出 vault。  
@@ -418,7 +425,7 @@ $bt/apksigner verify ~/PyPasswords/PyPasswords-release.apk
 ```
 [ -x /tmp/iconEnv/bin/python ] || python3 -m venv /tmp/iconEnv
 /tmp/iconEnv/bin/pip install pillow
-cd ~/PyPasswords
+cd ~/gits/ArgoVault
 /tmp/iconEnv/bin/python -c "import os;from PIL import Image;im=Image.open(os.path.expanduser('~/icon.png')).convert('RGBA');s=680/max(im.size);im=im.resize((round(im.width*s),round(im.height*s)),Image.LANCZOS);c=Image.new('RGBA',(1024,1024),(0,0,0,0));c.paste(im,((1024-im.width)//2,(1024-im.height)//2),im);c.save('app-icon.png')"
 npm run tauri icon app-icon.png -- --ios-color "#234e70"
 cat src-tauri/gen/android/app/src/main/res/values/ic_launcher_background.xml
@@ -432,22 +439,22 @@ jq '.bundle.icon' src-tauri/tauri.conf.json
 
 圖示不更新是啟動器快取，重開機即可；解除安裝重裝會清空資料，須先匯出備份。  
 
-### 9.3.2 改名為 PyPasswords（指令已提供，結果尚未回報）
+### 9.3.2 改名為 ArgoVault（指令已提供，結果尚未回報）
 
 ```
-cd ~/PyPasswords
-jq '.productName="PyPasswords" | .app.windows[0].title="PyPasswords"' src-tauri/tauri.conf.json > /tmp/tc.json && mv /tmp/tc.json src-tauri/tauri.conf.json
-perl -pi -e 's|(<string name="app_name">)[^<]*(</string>)|$1PyPasswords$2|; s|(<string name="main_activity_title">)[^<]*(</string>)|$1PyPasswords$2|' src-tauri/gen/android/app/src/main/res/values/strings.xml
+cd ~/gits/ArgoVault
+jq '.productName="ArgoVault" | .app.windows[0].title="ArgoVault"' src-tauri/tauri.conf.json > /tmp/tc.json && mv /tmp/tc.json src-tauri/tauri.conf.json
+perl -pi -e 's|(<string name="app_name">)[^<]*(</string>)|$1ArgoVault$2|; s|(<string name="main_activity_title">)[^<]*(</string>)|$1ArgoVault$2|' src-tauri/gen/android/app/src/main/res/values/strings.xml
 grep -n "app_name\|main_activity_title" src-tauri/gen/android/app/src/main/res/values/strings.xml
 jq '.productName, .app.windows[0].title' src-tauri/tauri.conf.json
 ```
 
-不更動 `identifier`。`.dmg` 檔名會依 `productName` 變成 `PyPasswords_<版本>_aarch64.dmg`。  
+不更動 `identifier`。`.dmg` 檔名會依 `productName` 變成 `ArgoVault_<版本>_aarch64.dmg`。  
 
 ### 9.3.3 正式版 APK（使用者實際使用的流程）
 
 ```
-cd ~/PyPasswords
+cd ~/gits/ArgoVault
 npm run tauri android build -- --apk --target aarch64
 java -jar ~/bin/uber-apk-signer.jar -a src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk
 adb install -r src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-aligned-debugSigned.apk
@@ -458,7 +465,7 @@ adb install -r src-tauri/gen/android/app/build/outputs/apk/universal/release/app
 ### 9.3.4 macOS `.dmg`（指令已提供，尚未回報結果）
 
 ```
-cd ~/PyPasswords
+cd ~/gits/ArgoVault
 jq '.app.windows[0].width=1100 | .app.windows[0].height=760' src-tauri/tauri.conf.json > /tmp/tc.json && mv /tmp/tc.json src-tauri/tauri.conf.json
 npm run tauri build -- --bundles dmg
 ls -lh src-tauri/target/release/bundle/dmg/
@@ -469,7 +476,7 @@ ls -lh src-tauri/target/release/bundle/dmg/
 
 請在本機圖形介面的 Terminal 執行（`.dmg` 排版會用 AppleScript）。未簽署也未公證的 App 在別台 Mac 會被 Gatekeeper 擋下。「禁止截圖」與返回鍵只在 Android 有效。  
 
-### 9.4 `MainActivity.kt` 內容
+### 9.4 `MainActivity.kt` 內容（含生物辨識橋接的掛載）
 
 ```
 package com.havelight.pypasswords
@@ -488,6 +495,11 @@ import java.io.File
 
 class MainActivity : TauriActivity() {
   private val observers = mutableListOf<FileObserver>()
+
+  override fun onWebViewCreate(webView: WebView) {
+    webView.addJavascriptInterface(PwBio(this, webView), "PwBio")
+    super.onWebViewCreate(webView)
+  }
 
   private fun flagFiles() = listOf(File(dataDir, "secure.flag"), File(filesDir, "secure.flag"))
 
@@ -561,6 +573,192 @@ class MainActivity : TauriActivity() {
 }
 ```
 
+### 9.4.1 `PwBio.kt` 內容
+
+```
+package com.havelight.pypasswords
+
+import android.content.Context
+import android.os.Build
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyPermanentlyInvalidatedException
+import android.security.keystore.KeyProperties
+import android.util.Base64
+import android.webkit.JavascriptInterface
+import android.webkit.WebView
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
+import java.security.KeyStore
+import java.security.MessageDigest
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
+
+class PwBio(private val activity: FragmentActivity, private val webView: WebView) {
+  private val prefs = activity.getSharedPreferences("pw_bio", Context.MODE_PRIVATE)
+  private val strong = BiometricManager.Authenticators.BIOMETRIC_STRONG
+
+  private fun alias(profile: String): String {
+    val d = MessageDigest.getInstance("SHA-256").digest(profile.toByteArray(Charsets.UTF_8))
+    return "pwbio_" + d.joinToString("") { "%02x".format(it) }.substring(0, 32)
+  }
+
+  private fun keyStore(): KeyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+
+  private fun createKey(alias: String): SecretKey {
+    val b = KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+      .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+      .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+      .setKeySize(256)
+      .setUserAuthenticationRequired(true)
+      .setInvalidatedByBiometricEnrollment(true)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+      b.setUserAuthenticationParameters(0, KeyProperties.AUTH_BIOMETRIC_STRONG)
+    } else {
+      @Suppress("DEPRECATION")
+      b.setUserAuthenticationValidityDurationSeconds(-1)
+    }
+    val g = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+    g.init(b.build())
+    return g.generateKey()
+  }
+
+  private fun reply(id: String, code: String, data: String = "") {
+    val js = "window.__pwBioDone&&window.__pwBioDone(\"$id\",\"$code\",\"$data\")"
+    activity.runOnUiThread { webView.evaluateJavascript(js, null) }
+  }
+
+  private fun prompt(
+    title: String,
+    cancel: String,
+    cipher: Cipher,
+    onOk: (Cipher) -> Unit,
+    onFail: (String, String) -> Unit
+  ) {
+    val cb = object : BiometricPrompt.AuthenticationCallback() {
+      override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+        val c = result.cryptoObject?.cipher
+        if (c == null) onFail("error", "nocrypto") else onOk(c)
+      }
+
+      override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+        val code = when (errorCode) {
+          BiometricPrompt.ERROR_USER_CANCELED,
+          BiometricPrompt.ERROR_NEGATIVE_BUTTON,
+          BiometricPrompt.ERROR_CANCELED -> "cancel"
+          BiometricPrompt.ERROR_LOCKOUT,
+          BiometricPrompt.ERROR_LOCKOUT_PERMANENT -> "lockout"
+          else -> "error"
+        }
+        onFail(code, errorCode.toString())
+      }
+    }
+    val info = BiometricPrompt.PromptInfo.Builder()
+      .setTitle(title)
+      .setAllowedAuthenticators(strong)
+      .setNegativeButtonText(cancel)
+      .setConfirmationRequired(false)
+      .build()
+    BiometricPrompt(activity, ContextCompat.getMainExecutor(activity), cb)
+      .authenticate(info, BiometricPrompt.CryptoObject(cipher))
+  }
+
+  @JavascriptInterface
+  fun status(): String = when (BiometricManager.from(activity).canAuthenticate(strong)) {
+    BiometricManager.BIOMETRIC_SUCCESS -> "ok"
+    BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> "unenrolled"
+    BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE -> "nohw"
+    BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> "unavail"
+    else -> "unsupported"
+  }
+
+  @JavascriptInterface
+  fun has(profile: String): Boolean {
+    val a = alias(profile)
+    return try { prefs.contains(a) && keyStore().containsAlias(a) } catch (e: Exception) { false }
+  }
+
+  @JavascriptInterface
+  fun remove(profile: String) {
+    val a = alias(profile)
+    prefs.edit().remove(a).apply()
+    try { keyStore().deleteEntry(a) } catch (e: Exception) { }
+  }
+
+  @JavascriptInterface
+  fun enroll(profile: String, secretB64: String, title: String, cancel: String, id: String) {
+    activity.runOnUiThread {
+      val secret = try {
+        Base64.decode(secretB64, Base64.NO_WRAP)
+      } catch (e: Exception) {
+        reply(id, "error", "badinput"); return@runOnUiThread
+      }
+      val a = alias(profile)
+      try {
+        remove(profile)
+        val key = createKey(a)
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, key)
+        prompt(title, cancel, cipher, { c ->
+          try {
+            val ct = c.doFinal(secret)
+            val v = Base64.encodeToString(c.iv, Base64.NO_WRAP) + ":" + Base64.encodeToString(ct, Base64.NO_WRAP)
+            prefs.edit().putString(a, v).apply()
+            reply(id, "ok")
+          } catch (e: Exception) {
+            remove(profile)
+            reply(id, "error", e.javaClass.simpleName)
+          } finally {
+            secret.fill(0)
+          }
+        }, { code, d ->
+          secret.fill(0)
+          remove(profile)
+          reply(id, code, d)
+        })
+      } catch (e: Exception) {
+        secret.fill(0)
+        remove(profile)
+        reply(id, "error", e.javaClass.simpleName)
+      }
+    }
+  }
+
+  @JavascriptInterface
+  fun unlock(profile: String, title: String, cancel: String, id: String) {
+    activity.runOnUiThread {
+      val a = alias(profile)
+      val stored = prefs.getString(a, null)
+      if (stored == null || !has(profile)) { reply(id, "missing"); return@runOnUiThread }
+      val parts = stored.split(":")
+      if (parts.size != 2) { remove(profile); reply(id, "missing"); return@runOnUiThread }
+      try {
+        val key = keyStore().getKey(a, null) as SecretKey
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, Base64.decode(parts[0], Base64.NO_WRAP)))
+        prompt(title, cancel, cipher, { c ->
+          try {
+            val pt = c.doFinal(Base64.decode(parts[1], Base64.NO_WRAP))
+            reply(id, "ok", Base64.encodeToString(pt, Base64.NO_WRAP))
+            pt.fill(0)
+          } catch (e: Exception) {
+            reply(id, "error", e.javaClass.simpleName)
+          }
+        }, { code, d -> reply(id, code, d) })
+      } catch (e: KeyPermanentlyInvalidatedException) {
+        remove(profile)
+        reply(id, "invalidated")
+      } catch (e: Exception) {
+        reply(id, "error", e.javaClass.simpleName)
+      }
+    }
+  }
+}
+```
+
 ### 9.5 實機驗證清單
 
 狀態：第 1 至 14 項使用者已回報全部 OK（未逐項附輸出）；第 15 至 17 項為本輪新增，使用者回報測試完成，未逐項描述。  
@@ -581,11 +779,12 @@ class MainActivity : TauriActivity() {
 14. 自訂圖示時，確認桌面圖示未被遮罩裁切；圖示不更新是啟動器快取，重開機或解除安裝後再裝。  
 15. 返回鍵：對話框逐層關閉、運算中不動作、編輯取消、多選結束、詳情回清單、搜尋清空、清單最上層鎖定並退出、建立分頁回解鎖分頁、解鎖頁退出（見 4.7）。  
 16. 單筆刪除：已設定 PIN 時依序出現確認、PIN、主碼；未設定 PIN 時略過 PIN。  
-17. 名稱：桌面圖示下方與設定中的應用程式名稱為 `PyPasswords`（見 9.3.2）。  
+17. 名稱：桌面圖示下方與設定中的應用程式名稱為 `ArgoVault`（見 9.3.2）。  
+18. 生物辨識（第 11.5 節，全部尚未在實機驗證）：「更多」啟用時先要求主碼、再跳出系統生物辨識；鎖定後解鎖頁出現按鈕並可解鎖；取消不報錯；新增或刪除指紋後按鈕消失並提示；變更主碼後自動更新註冊；刪除設定檔後註冊清除；其他設定檔不受影響。  
 
 ## 10. Git 版本控制（步驟已提供，尚未回報執行結果）
 
-專案路徑為 `~/PyPasswords`（使用者曾寫成 `~/PyPassword`）。決定事項：  
+專案路徑為 `~/gits/ArgoVault`（改名前為 `~/gits/PyPasswords`；使用者曾把舊名寫成 `~/PyPassword`）。決定事項：  
 
 - `src-tauri/gen/android`、`src-tauri/icons`、`app-icon.png`、`package-lock.json`、`src-tauri/Cargo.lock` 都納入版本控制。  
 - 絕不納入：金鑰（`*.jks`、`*.keystore`、`keystore.properties`）、`*.apk`、`*.dmg`、`node_modules`、`src-tauri/target`，以及所有 vault 資料（`*.bin`、`*.sha256`、`*.bak`、`*.tmp`）。  
@@ -629,16 +828,133 @@ keystore.properties
 建立與提交：  
 
 ```
-cd ~/PyPasswords
+cd ~/gits/ArgoVault
 git rev-parse --show-toplevel
 git init
 git add -A
 git status --short
 git ls-files | grep -E '\.(bin|jks|keystore|apk|dmg|sha256)$'
-git commit -m "Initial commit: PyPasswords Tauri 2 app"
+git commit -m "Initial commit: ArgoVault Tauri 2 app"
 ```
 
-2：`git init` 前先確認上層沒有別的 repo（若印出路徑，代表 `~/PyPasswords` 已在某個 repo 內）。  
+2：`git init` 前先確認上層沒有別的 repo（若印出路徑，代表 `~/gits/ArgoVault` 已在某個 repo 內）。  
 6：不應出現任何列；若有，先改 `.gitignore` 再 `git rm --cached <檔案>`。  
 
 未確定之處：Tauri 自帶的 `src-tauri/gen/android/.gitignore` 實際內容未查證，提交後以 `git ls-files src-tauri/gen/android` 檢查是否混入 `build/`、`.gradle/`、`jniLibs/` 的產物，並以 `git check-ignore -v <路徑>` 查明被哪一條規則忽略。  
+
+## 11. 改名為 ArgoVault 與本輪修改（2026-11-11）
+
+### 11.1 名稱
+
+原名 PyPasswords 易撞名，且「Py」已不符現況（前端為 HTML，外殼為 Rust）。使用者提議 SecurePass 並要求建議。  
+
+- 不採用 SecurePass：GitHub 上至少有五個同名密碼管理專案（`ndg24/securepass-password-manager`、`GDesir23/securepass`、`pleomati/securepass`、`kayleexx/securepass`、`andude10/securepass`），另有 `FelixJohan/Password_Manager` 自稱 SecurePass。  
+- 不採用 HaveVault：與既有的自架伺服器產品 Haven Vault 過於相近。  
+- 採用 ArgoVault（由 Argon2id 與 vault 組成）：搜尋未發現同名密碼管理程式，只見一個 Argo CD 外掛用途的容器映像名稱 `pmo-argovault`。這只是搜尋結果的觀察，不是商標或套件名稱的完整查核；公開前請再查 GitHub、Google Play、crates.io 與 npm。  
+- GitHub：帳號 `HaveLightII`，倉庫 `HaveLightII/ArgoVault`。  
+
+刻意不更動：
+
+| 項目 | 原因 |
+| --- | --- |
+| `identifier`（`com.havelight.pypasswords`）與 Kotlin 套件路徑 | 更改等於換成另一個 App：無法覆蓋安裝，AppData 不同，vault 與設定須先匯出再匯入 |
+| Rust crate 與 lib 名稱（推測為 `pypasswords`、`pypasswords_lib`，來自 Tauri 範本） | 影響 `main.rs` 的呼叫與 Android 原生函式庫名稱；尚未見到 `Cargo.toml` 與 `main.rs`，須以 `grep -rn pypasswords src-tauri --include=*.toml --include=*.rs` 確認 |
+| `PyPasswords.py`、`patchPyPasswords*.py` | 原 Python 程式與歷史檔名 |
+
+### 11.2 改名指令
+
+```
+cd ~/gits/PyPasswords
+jq '.productName="ArgoVault" | .app.windows[0].title="ArgoVault"' src-tauri/tauri.conf.json > /tmp/tc.json && mv /tmp/tc.json src-tauri/tauri.conf.json
+perl -pi -e 's|(<string name="app_name">)[^<]*(</string>)|$1ArgoVault$2|; s|(<string name="main_activity_title">)[^<]*(</string>)|$1ArgoVault$2|' src-tauri/gen/android/app/src/main/res/values/strings.xml
+cd ..
+mv PyPasswords ArgoVault
+cd ArgoVault
+git remote -v
+git remote set-url origin https://github.com/HaveLightII/ArgoVault.git
+```
+
+2：改 `productName` 與視窗標題（`.dmg` 檔名隨之改變）。  
+3：改 Android 桌面名稱；`strings.xml` 內字串若帶雙引號會一併被取代。  
+5、6、7：改目錄名稱並進入。  
+8：查看現有遠端。  
+9：已有 `origin` 時改網址；若沒有遠端，改用 `git remote add origin` 加同一網址。  
+
+專案根目錄的 `index.html.before-patch` 是舊修補前的備份，確認不需要後可刪除，且不要提交。改名後需重新建置並安裝（見 9.3.3），`identifier` 不變，所以可覆蓋安裝且資料保留。  
+
+### 11.3 查看密碼前是否再次輸入主碼（已實作）
+
+新增設定 `reauth`（預設開，行為與先前相同）。關閉後，`S.ses` 保留解鎖時衍生出的不可匯出 `CryptoKey`，查看密碼直接解密，不再跑 KDF，也不再詢問主碼。`authOpen` 的細節見 4.5，設定說明見 4.2。  
+
+- 只放寬「查看密碼」。編輯會在表單中顯示密碼，所以仍要求主碼；新增、刪除、匯入 CSV、變更主碼、轉換格式、刪除資料庫也一律要求。  
+- 代價：金鑰在記憶體停留時間從「單次操作」延長到「整個解鎖期間」。不可匯出的 `CryptoKey` 無法被 JavaScript 讀出原始位元組，但頁面內任何腳本都能拿它解密；本程式沒有網路請求與外部內容，此風險低。另一個代價是手機在解鎖狀態被他人拿到時，可直接查看密碼，只能靠閒置鎖定與背景鎖定縮短時間。  
+- 設定存於不加密的 `settings.json`：改動它只會改變介面是否詢問，沒有已解鎖的工作階段就沒有金鑰可用。  
+
+已驗證（容器內 Playwright，瀏覽器模式，PWV2，無頁面錯誤）：預設開時查看會跳出主碼對話框；輸入後可顯示密碼；關閉後設定寫入 `settings.json`（`reauth` 為 `false`）；關閉後重新解鎖，查看不再詢問且顯示正確；新增紀錄仍詢問；重新開啟設定後又詢問；關閉狀態下輸入一次主碼後，下一次查看不再詢問；錯誤主碼不會解鎖；還原預設值後 `reauth` 回到 `true`；標題與品牌為 ArgoVault。  
+
+未驗證：Android 實機；PWV1 與 PWV3 路徑；「解鎖時自動轉換為預設格式」開啟時，`S.ses` 改存新 salt 金鑰的路徑（程式已處理，但沒有測試）。  
+
+### 11.4 生物辨識解鎖（評估結果；實作見 11.5）
+
+結論：可行，但僅限 Android（與 iOS），且「只跳出指紋提示」不足以解鎖，必須把秘密綁在 Android Keystore。  
+
+- 官方外掛 `tauri-plugin-biometric` 僅提供提示（`authenticate`），只在 Android 與 iOS 可用（Tauri, n.d.）。它回傳成功或失敗，不保管任何金鑰，所以無法取代主碼解開 vault；它能做的只是「已解鎖工作階段內的閘門」，例如搭配 11.3 的 `S.ses` 取代查看密碼前的主碼輸入，但閘門在 JavaScript 層，防不了能改動程式或執行腳本的人。  
+- 要真的以生物辨識解鎖，須用 `BiometricPrompt` 搭配 `CryptoObject`：以 `setUserAuthenticationRequired(true)` 在 Keystore 建立金鑰，解密一個事先包裝好的秘密；未使用 `CryptoObject` 的實作可被 Frida 繞過（Android Developers, n.d.；OWASP, n.d.）。  
+- 現成選項：社群外掛 `tauri-plugin-biometry`（`setData`、`getData` 等，資料存於 Android Keystore）；但版本仍為 0.2.x 與 0.3.0-rc，且我沒有查證它在 Android 端是否以 `CryptoObject` 綁定金鑰，使用前須讀其 Kotlin 原始碼（tauri-plugin-biometry, n.d.）。`tauri-plugin-keystore`（2.1.0-alpha）的原始碼可見 `BiometricPrompt` 與 `CryptoObject` 的用法，但仍是 alpha（tauri-plugin-keystore, n.d.）。  
+- 建議做法：不經 Tauri 外掛，在現有 `MainActivity.kt` 加一個很小的 `@JavascriptInterface` 橋接（可用性檢查、註冊、解鎖、移除），與目前的 `FLAG_SECURE`、返回鍵做法一致；需在 `app/build.gradle.kts` 加 `androidx.biometric` 相依（版本以官方最新穩定版為準）。`TauriActivity` 是否為 `FragmentActivity`（`BiometricPrompt` 需要）尚未查證。  
+- 包裝對象：建議包裝主碼位元組，而非衍生金鑰。衍生金鑰綁定 salt，轉換格式、變更主碼、自動轉換都會使它失效；包裝主碼則解鎖後仍走原本的 `derive`（PWV3 在手機上約數秒），只在主碼變更時失效（解密失敗就清除並要求重新註冊）。主碼明文只在解鎖當下短暫存在，與手動輸入相同。  
+- 其他設計要點：每個設定檔各自一把 Keystore 金鑰（別名含設定檔名）；註冊須先通過主碼驗證；`setInvalidatedByBiometricEnrollment(true)`，新增指紋即失效；只接受 `BIOMETRIC_STRONG`，不接受裝置密碼（Android Developers, n.d.）；永遠保留主碼解鎖；是否啟用存在 `settings.json`，密文放在 App 私有資料目錄。許多裝置的臉部辨識只屬 Class 2（弱），不符合 `BIOMETRIC_STRONG`，實際以裝置回報為準。  
+- 威脅模型：生物辨識解鎖是便利功能，強度低於主碼；與「裝置本身需可信」的既有假設一致。macOS 版與瀏覽器版不支援。  
+- 容器無法建置 Android，所有 Kotlin 與 Keystore 行為都必須在實機驗證。  
+- 補充查證：`TauriActivity` 繼承 `WryActivity`，後者繼承 `AppCompatActivity`（因此是 `FragmentActivity`，可用 `BiometricPrompt`）；`MainActivity` 可覆寫 `onWebViewCreate(webView)` 取得 `WebView`；`androidx.biometric` 目前穩定版為 1.1.0（Android Developers, n.d.）。  
+
+### 11.5 生物辨識解鎖的實作（已寫成，待實機驗證）
+
+做法：不使用 Tauri 外掛，由 `MainActivity.kt` 在 `onWebViewCreate` 以 `addJavascriptInterface` 掛上 `PwBio`（`PwBio.kt`）。前端只載入本機頁面，沒有外部內容。  
+
+啟用（`enroll`）：「更多」選單選啟用，先以主碼驗證，再把主碼位元組（base64）交給 `PwBio.enroll`。原生端為該設定檔建立 Keystore 的 AES-256-GCM 金鑰（`setUserAuthenticationRequired(true)`、`setInvalidatedByBiometricEnrollment(true)`，Android 11 以上為 `setUserAuthenticationParameters(0, AUTH_BIOMETRIC_STRONG)`，較舊版為 `setUserAuthenticationValidityDurationSeconds(-1)`），以 `BiometricPrompt` 搭配 `CryptoObject` 通過生物辨識後加密主碼，密文與 IV 存入私有 `SharedPreferences`（`pw_bio`）。金鑰別名為設定檔名稱 SHA-256 的前 32 個十六進位字元。  
+
+解鎖（`unlock`）：解鎖頁按「生物辨識解鎖」，同樣經 `CryptoObject` 解密出主碼，交給 `doUnlock` 走原本的 `derive` 與解密（PWV3 仍要跑 Argon2id）。  
+
+失效處理：新增指紋使金鑰失效（`KeyPermanentlyInvalidatedException`）、密文遺失、解密後無法開啟資料庫（主碼已變），都會清除註冊並提示以主碼解鎖後重新啟用。變更主碼成功後，前端以新主碼重新註冊（多跳一次生物辨識），取消則停用。轉換格式與自動轉換不影響註冊，因為包裝的是主碼而不是金鑰。  
+
+回傳協定：原生端以 `window.__pwBioDone(id, code, data)` 回呼；`code` 為 `ok`、`cancel`、`lockout`、`missing`、`invalidated`、`error`。  
+
+限制與風險：  
+
+- 主碼的 base64 字串會在 JavaScript 堆積中短暫存在，無法覆寫（與第 7 節的既有限制相同）。  
+- 只接受 `BIOMETRIC_STRONG`；許多裝置的臉部辨識不符，此時顯示無法使用。  
+- 假設 `minSdk` 至少為 24（`setInvalidatedByBiometricEnrollment` 需要 API 24），Tauri 範本預設值如此，但未見實際檔案，指令會印出 `minSdk` 供確認。  
+- 若 `build.gradle.kts` 有多個 `dependencies {` 區塊，`perl` 只改第一個，須檢查輸出。  
+- R8 可能移除或改名 `@JavascriptInterface` 方法，所以加了 `-keepclassmembers` 規則；Tauri 範本是否啟用 minify 未查證。  
+- 建議把 `AndroidManifest.xml` 的 `allowBackup` 設為 `false`：Keystore 金鑰不會備份，密文被還原到另一台裝置時只會走「失效」流程，但密文本身不應離開裝置。  
+- Kotlin 沒有在容器內編譯（沒有 Kotlin 編譯器與網路）；前端以模擬的 `PwBio` 測過，結果見下。  
+
+安裝步驟：把 `index.html`、`MainActivity.kt`、`PwBio.kt`、`applyBiometric.sh` 放到 `~/Downloads` 後執行：  
+
+```
+bash ~/Downloads/applyBiometric.sh
+cd ~/gits/ArgoVault
+npm run tauri android build -- --apk --target aarch64
+java -jar ~/bin/uber-apk-signer.jar -a src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk
+adb install -r src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-aligned-debugSigned.apk
+```
+
+1：腳本內容為複製檔案並補上 `androidx.biometric:biometric:1.1.0` 相依、`USE_BIOMETRIC` 權限與 R8 規則，皆先檢查是否已存在。  
+1：腳本結束後須目視檢查印出的 `biometric`、`minSdk`、`USE_BIOMETRIC` 與 `proguard-rules.pro` 尾端。  
+3 至 5：建置、簽署、安裝，與 9.3.3 相同；`identifier` 不變，可覆蓋安裝。  
+
+若 Kotlin 編譯失敗，貼回完整錯誤；若按鈕沒出現，用 `adb logcat -v time | grep -iE "chromium|PwBio|BiometricPrompt|AndroidRuntime"` 查看，並確認裝置已登錄指紋且符合 Class 3。  
+
+已驗證（容器內 Playwright，瀏覽器模式，模擬 `window.PwBio`，無頁面錯誤）：選單按鈕在有橋接時出現且文字依狀態切換；錯誤主碼不會註冊；註冊的內容等於主碼；鎖定後解鎖頁出現按鈕並可解鎖；變更主碼後註冊自動更新、新主碼可用生物辨識解鎖；註冊內容過期時不解鎖、註冊被清除、按鈕消失；刪除設定檔後註冊清除；沒有橋接時兩個按鈕都隱藏。  
+
+未驗證：全部原生部分（Kotlin 編譯、Keystore、`BiometricPrompt`、`CryptoObject`、`KeyPermanentlyInvalidatedException`、R8）。  
+
+參考資料：  
+
+- Android Developers. (n.d.). *Biometric* [Release notes]. Google. https://developer.android.com/jetpack/androidx/releases/biometric  
+- Android Developers. (n.d.). *Show a biometric authentication dialog*. Google. https://developer.android.com/identity/sign-in/biometric-auth  
+- OWASP. (n.d.). *Testing local authentication* [Mobile security testing guide]. https://pentest.y-security.de/Mobile%20Security%20Testing%20Guide/2022/0x05f-Testing-Local-Authentication/  
+- Tauri. (n.d.). *Biometric*. https://v2.tauri.app/fr/plugin/biometric/  
+- tauri-plugin-biometry (Version 0.3.0-rc.1) [Computer software]. (n.d.). docs.rs. https://docs.rs/crate/tauri-plugin-biometry/0.3.0-rc.1  
+- tauri-plugin-keystore (Version 2.1.0-alpha.2) [Computer software]. (n.d.). docs.rs. https://docs.rs/crate/tauri-plugin-keystore/latest/source/android/src/main/java/KeystorePlugin.kt  
