@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "PyPasswords",
+  "productName": "ArgoVault",
   "version": "0.1.0",
   "identifier": "com.havelight.pypasswords",
   "build": {
@@ -10,7 +10,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "PyPasswords",
+        "title": "ArgoVault",
         "width": 800,
         "height": 600
       }
