@@ -108,6 +108,9 @@ input,textarea,select,.hash{-webkit-user-select:text;user-select:text}
 .mbar .sp{flex:1}
 .ck{flex:none;width:22px;height:22px;border:2px solid var(--bd);border-radius:6px;display:grid;place-items:center;font-size:14px;line-height:1;color:var(--on)}
 .it.sel .ck{background:var(--ac);border-color:var(--ac)}
+body.af #bGen,body.af #bSet,body.af #bLock,body.af .tabs,body.af #bImpG,body.af #bDelG{display:none!important}
+.afit{display:block;text-align:left;margin:8px 0;padding:12px 14px}
+.afit small{display:block;color:var(--mu);font-size:12.5px;margin-top:2px;font-weight:400}
 </style>
 </head>
 <body>
@@ -137,6 +140,16 @@ input,textarea,select,.hash{-webkit-user-select:text;user-select:text}
    <p class="note">主碼遺失將導致此設定檔所有紀錄永久無法復原，本程式不提供任何救援機制。</p>
    <button class="btn pri full" id="bCreate">建立設定檔</button>
   </div>
+ </div>
+</section>
+
+<section class="gate" id="afp" hidden>
+ <h1>自動填入</h1>
+ <p class="lead" id="afSrc" data-nt></p>
+ <div class="panel">
+  <ul id="afUl" data-nt style="list-style:none;margin:0;padding:0"></ul>
+  <p class="note" id="afWarn" data-nt hidden></p>
+  <div class="alt"><button class="btn gh mini" id="afAll" type="button" data-nt></button><button class="btn mini" id="afNo" type="button">取消</button></div>
  </div>
 </section>
 
@@ -171,6 +184,8 @@ input,textarea,select,.hash{-webkit-user-select:text;user-select:text}
 <dialog id="dlgAuth">
  <h3>再次輸入主碼</h3><p class="note" id="aWhy" data-nt></p>
  <input id="aPw" type="password" autocomplete="off" aria-label="主碼" enterkeyhint="go">
+ <p class="note" id="aErr" data-nt hidden style="border-color:var(--dg);color:var(--dg)"></p>
+ <button class="btn gh full" id="aBio" type="button" hidden>生物辨識驗證</button>
  <div class="fa"><button class="btn pri" id="aOk">驗證</button><button class="btn" id="aNo">取消</button></div>
 </dialog>
 <dialog id="dlgAsk">
@@ -370,14 +385,14 @@ const WEAK=new Set(["password","123456","12345678","qwerty","111111","123456789"
 let S=null,idle,revT,edT,hidT,clipTimer=null,pend=null;
 
 /* ---------- 設定 ---------- */
-const DEF={lang:"",fmt:"PWV3",auto:false,weak:true,secure:false,pin:null,idle:5,bg:60,rev:30,len:20,clip:true,reauth:true};
+const DEF={lang:"",fmt:"PWV3",auto:false,weak:true,secure:false,pin:null,idle:5,bg:60,rev:30,len:20,clip:true,reauth:true,afUser:"accountName"};
 let cfg={...DEF};
 const FMTID={PWV3:"PWV3",PWV2:"PWV2",FERNET:"PWV1"};
 function cfgClean(){
  const pick=(v,a,d)=>a.includes(v)?v:d;
  cfg.lang=pick(cfg.lang,["","zh","en"],"");
  cfg.fmt=pick(cfg.fmt,["PWV3","PWV2","FERNET"],"PWV3");
- cfg.auto=!!cfg.auto;cfg.weak=cfg.weak!==false;cfg.secure=!!cfg.secure;cfg.clip=cfg.clip!==false;cfg.reauth=cfg.reauth!==false;
+ cfg.auto=!!cfg.auto;cfg.weak=cfg.weak!==false;cfg.secure=!!cfg.secure;cfg.clip=cfg.clip!==false;cfg.reauth=cfg.reauth!==false;cfg.afUser=pick(cfg.afUser,["accountName","linkedAccount"],"accountName");
  cfg.idle=pick(+cfg.idle,[1,3,5,10,30],5);cfg.bg=pick(+cfg.bg,[30,60,300,900],60);cfg.rev=pick(+cfg.rev,[15,30,60],30);
  cfg.len=Math.min(64,Math.max(12,Math.round(+cfg.len)||20));
  const p=cfg.pin;cfg.pin=p&&typeof p.s==="string"&&typeof p.h==="string"&&Number.isInteger(p.i)?p:null;
@@ -386,7 +401,8 @@ async function cfgLoad(){
  try{
   let raw=null;
   if(tauriApi){const b=await tauriApi.fs.readFile(await tauriApi.path.join(await tauriApi.path.appDataDir(),"settings.json")).catch(()=>null);if(b)raw=dec.decode(b)}
-  else raw=localStorage.getItem(SETKEY);
+  else if(afApi)raw=afApi.settings();
+   else raw=localStorage.getItem(SETKEY);
   if(raw)cfg={...DEF,...JSON.parse(raw)};
  }catch{cfg={...DEF}}
  cfgClean();
@@ -412,8 +428,26 @@ async function cfgSave(){
 const autoLang=()=>/^zh/i.test(navigator.language||"")?"zh":"en";
 let L=autoLang();
 const EN={
+"請求來源：{s}":"Requested by: {s}",
+"無法取得請求來源":"Could not determine the request source",
+"目前顯示所有紀錄，請確認請求來源是你要登入的網站或 App 再選擇。":"Showing all records. Make sure the requester is the site or app you want to sign in to before choosing.",
+"沒有符合此來源的紀錄。請在主程式為該紀錄填寫「網站網址」，或按「顯示所有紀錄」手動選擇。":"No record matches this source. Add a website URL to the record in the main app, or tap Show all records to choose manually.",
+"顯示所有紀錄":"Show all records",
+"只顯示符合的紀錄":"Show matching records only",
+"填入失敗：{m}":"Fill failed: {m}",
+"自動填入":"Autofill",
+"網站網址（自動填入用，選填）":"Website URL (for autofill, optional)",
+"網站網址":"Website URL",
+"目前狀態：已啟用":"Status: enabled",
+"目前狀態：未啟用":"Status: not enabled",
+"開啟系統設定":"Open system settings",
+"填入的帳號欄位":"Field used as the username",
+"啟用後，請在 Chrome 設定的「自動填入服務」選「使用其他服務自動填入」。紀錄需填寫「網站網址」才會自動比對；每次填入都要先解鎖。":"After enabling, choose \"Autofill using another service\" under Autofill services in Chrome settings. A record needs a Website URL to be matched automatically; every fill requires unlocking first.",
+"自動填入模式為唯讀":"Autofill mode is read-only",
 "生物辨識解鎖":"Biometric unlock",
 "改用主碼":"Use master password",
+"生物辨識驗證":"Biometric verification",
+"生物辨識解鎖已停用（主碼可能已變更），請以主碼驗證後重新啟用":"Biometric unlock was disabled (the master password may have changed). Verify with the master password and enable it again",
 "啟用生物辨識解鎖":"Enable biometric unlock",
 "停用生物辨識解鎖":"Disable biometric unlock",
 "更新生物辨識解鎖":"Update biometric unlock",
@@ -553,7 +587,7 @@ function toast(m,err){const el=$("#toast");el.textContent=t(m);el.className="on"
 const isEnter=e=>(e.key==="Enter"||e.keyCode===13)&&!e.isComposing;
 function download(name,part){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([part]));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1e3)}
 async function work(msg,fn){$("#busyT").textContent=msg;$("#busy").hidden=false;await new Promise(r=>setTimeout(r,40));try{return await fn()}catch(e){toast(e.message,1);return null}finally{$("#busy").hidden=true}}
-const tauriApi=window.__TAURI__??null;
+const tauriApi=window.__TAURI__??null,afApi=window.PwAF||null;
 let clipPending=false;
 async function copy(text){try{if(tauriApi)await tauriApi.clipboardManager.writeText(text);else await navigator.clipboard.writeText(text);clipPending=cfg.clip;toast(cfg.clip?"已複製。貼上後請自行清除剪貼簿，App 不會代為清除":"已複製")}catch{toast("無法存取剪貼簿",1)}}
 function clipClear(){
@@ -567,6 +601,15 @@ const vaultCache=new Map();
 const isVaultBytes=u=>{try{return !!hdr(u).fmt&&u.length>=48}catch{return false}};
 const vaultPath=async(name,ext=".bin")=>tauriApi.path.join(await tauriApi.path.appDataDir(),"vault",name+ext);
 async function storeInit(){
+ if(afApi){
+  for(const name of JSON.parse(afApi.profiles())){
+   for(const ext of [".bin",".bin.bak"]){
+    const x=afApi.read(name,ext);if(!x)continue;
+    const u=unb64(x);if(isVaultBytes(u)){vaultCache.set(name,u);break}
+   }
+  }
+  return;
+ }
  if(!tauriApi)return;
  const{fs,path}=tauriApi;
  if(!fs||!path)throw new Error("Tauri 全域 API 缺少 fs 或 path");
@@ -582,9 +625,10 @@ async function storeInit(){
   if(bytes&&isVaultBytes(bytes))vaultCache.set(name,bytes);
  }));
 }
-const profiles=()=>tauriApi?[...vaultCache.keys()].sort():Object.keys(localStorage).filter(k=>k.startsWith(PRE)).map(k=>k.slice(PRE.length)).sort();
-const storeGet=name=>{if(tauriApi)return vaultCache.get(name)??null;const v=localStorage.getItem(PRE+name);return v?unb64(v):null};
+const profiles=()=>tauriApi||afApi?[...vaultCache.keys()].sort():Object.keys(localStorage).filter(k=>k.startsWith(PRE)).map(k=>k.slice(PRE.length)).sort();
+const storeGet=name=>{if(tauriApi||afApi)return vaultCache.get(name)??null;const v=localStorage.getItem(PRE+name);return v?unb64(v):null};
 async function storePut(name,bytes){
+ if(afApi)throw new Error("自動填入模式為唯讀");
  if(!tauriApi){localStorage.setItem(PRE+name,b64(bytes));return}
  const fs=tauriApi.fs,main=await vaultPath(name),tmp=await vaultPath(name,".bin.tmp"),bak=await vaultPath(name,".bin.bak");
  await fs.writeFile(tmp,bytes);
@@ -596,6 +640,7 @@ async function storePut(name,bytes){
  vaultCache.set(name,bytes.slice());
 }
 async function storeDel(name){
+ if(afApi)throw new Error("自動填入模式為唯讀");
  if(!tauriApi){localStorage.removeItem(PRE+name);return}
  for(const ext of [".bin",".bin.bak",".bin.tmp"])await tauriApi.fs.remove(await vaultPath(name,ext)).catch(()=>{});
  vaultCache.delete(name);
@@ -673,9 +718,21 @@ const meter=p=>{if(!cfg.weak||!p)return "";const[c,lab]=strength(p);return `<div
 const colorize=p=>[...p].map(c=>`<span class="${/[a-z]/i.test(c)?"l":/\d/.test(c)?"d":"s"}">${esc(c)}</span>`).join("");
 
 /* ---------- 主碼輸入：只以位元組短暫存在，用完即歸零 ---------- */
-function ask(reason){return new Promise(res=>{
- const d=$("#dlgAuth"),i=$("#aPw");$("#aWhy").textContent=reason;i.value="";
+let askBio=false;
+function ask(reason,bio){return new Promise(res=>{
+ const d=$("#dlgAuth"),i=$("#aPw"),ab=$("#aBio"),ae=$("#aErr");$("#aWhy").textContent=reason;i.value="";ae.hidden=true;askBio=false;
  const done=v=>{d.onclose=null;i.value="";d.close();res(v)};
+ ab.hidden=!(bio&&bioApi&&S&&bioHas(S.profile));
+ ab.onclick=async()=>{
+  const nm=S&&S.profile;if(!nm)return;
+  if(bioStatus()!=="ok"){ae.textContent=t(BIO_MSG);ae.hidden=false;return}
+  const r=await bioCall("unlock",nm,t("生物辨識驗證"),t("改用主碼"));
+  if(!d.open)return;
+  if(r.code==="ok"){askBio=true;return done(unb64(r.data))}
+  if(r.code==="cancel")return;
+  if(r.code==="invalidated"||r.code==="missing"){bioRemove(nm);refreshBio();ab.hidden=true;ae.textContent=t("生物辨識資料已變更或已失效，請以主碼解鎖後重新啟用");ae.hidden=false;return}
+  ae.textContent=t(r.code==="lockout"?"嘗試次數過多，生物辨識已暫時鎖定，請改用主碼":"生物辨識失敗：{c}",{c:r.data||r.code});ae.hidden=false;
+ };
  $("#aOk").onclick=()=>{if(!i.value)return;const b=enc.encode(i.value);i.value="";done(b)};
  $("#aNo").onclick=()=>done(null);
  i.onkeydown=e=>{if(isEnter(e)){e.preventDefault();$("#aOk").click()}};
@@ -691,9 +748,11 @@ async function authOpen(reason,soft){
   if(o)return o;
   if(S)S.ses=null;
  }
- const pw=await ask(reason);if(!pw)return null;
+ const pw=await ask(reason,true);if(!pw)return null;
+ const viaBio=askBio;
  try{
   const o=await work(t("驗證主碼中…"),()=>openVault(rawVault(),pw));
+  if(!o&&viaBio&&S){bioRemove(S.profile);refreshBio();toast("生物辨識解鎖已停用（主碼可能已變更），請以主碼驗證後重新啟用",1)}
   if(o&&S&&!cfg.reauth)S.ses={fmt:o.fmt,salt:o.salt,keys:o.keys};
   return o;
  }finally{pw.fill(0)}
@@ -720,10 +779,10 @@ function lock(){
  $("#vault").hidden=true;$("#gate").hidden=false;$("#bLock").hidden=true;$("#prof").hidden=true;
  $("#dt").innerHTML="";$("#ul").innerHTML="";$("#mbar").hidden=true;refreshGate();
 }
-function armIdle(){clearTimeout(idle);if(S)idle=setTimeout(()=>{lock();toast("閒置過久，已自動鎖定")},cfg.idle*6e4)}
+function armIdle(){clearTimeout(idle);if(S)idle=setTimeout(()=>{if(S&&S.ed)return;lock();toast("閒置過久，已自動鎖定")},cfg.idle*6e4)}
 function stopRev(){clearInterval(revT);if(S)S.rev=null}
 function hideRev(){stopRev();if(S)renderDetail()}
-function armEd(){clearTimeout(edT);edT=setTimeout(()=>{if(S&&S.ed){cancelEdit();toast("編輯閒置過久，已取消並清除")}},12e4)}
+function armEd(ms){clearTimeout(edT);edT=setTimeout(()=>{if(S&&S.ed){cancelEdit();toast("編輯閒置過久，已取消並清除");armIdle();if(document.hidden){clearTimeout(hidT);hidT=setTimeout(()=>{if(S)lock()},cfg.bg*1e3)}}},ms||12e4)}
 function endEdit(){clearTimeout(edT);if(S){S.ed=null;S.mode="view"}}
 function cancelEdit(){const n=S.mode==="new";endEdit();if(n)S.sel=null;render()}
 function select(id){endEdit();stopRev();S.sel=id;render();armIdle()}
@@ -749,7 +808,7 @@ function renderDetail(){
  if(!rv){$("#dt").innerHTML=head+`<dl style="margin:0">${row("帳號名稱",m.accountName,0)}${row("姓名",m.name,0)}</dl>
   <div class="lockbox"><b>${t("密碼與詳細資料已加密")}</b><p>${t("查看前需要再次輸入主碼，顯示 {n} 秒後自動隱藏。",{n:cfg.rev})}</p>
   <div class="fa"><button class="btn pri" data-a="rev">${t("查看密碼")}</button><button class="btn" data-a="edit">${t("編輯")}</button><span class="sp"></span><button class="btn dg" data-a="del">${t("刪除")}</button></div></div>`;return}
- $("#dt").innerHTML=head+`<dl style="margin:0">${row("帳號名稱",rv.accountName,1)}
+ $("#dt").innerHTML=head+`<dl style="margin:0">${row("帳號名稱",rv.accountName,1)}${row("網站網址",rv.url,0)}
  <div class="row pw"><dt>${t("密碼")}</dt><dd><div class="keys mask" id="pwv">••••••••••••</div>${meter(rv.password||"")}</dd><span style="display:flex;gap:6px"><button class="btn mini" data-a="show">${t("顯示")}</button><button class="btn mini" data-a="cpw">${t("複製")}</button></span></div>
  ${row("連結帳戶",rv.linkedAccount,1)}${row("姓名",rv.name,0)}
  ${(rv.notes||[]).length?`<div class="row"><dt>${t("備註")}</dt><dd><ul class="notes" style="max-height:none">${rv.notes.map(n=>`<li>${esc(n)}</li>`).join("")}</ul></dd><span></span></div>`:""}</dl>
@@ -760,8 +819,8 @@ function renderEdit(){
  const r=S.ed.rec,f=(k,l)=>`<label for="e_${k}">${t(l)}</label><input id="e_${k}" value="${esc(r[k]||"")}" autocomplete="off" enterkeyhint="next">`;
  $("#vault").classList.add("dt");
  $("#dt").innerHTML=`<div class="dh"><div><button class="btn gh back" data-a="cancel">${t("返回")}</button><h2>${t(r.id?"編輯紀錄":"新增紀錄")}</h2></div></div>
- ${f("accountType","帳戶類型")}${f("accountName","帳號名稱")}
- <label for="e_password">${t("密碼")}</label><div class="pwl"><input id="e_password" type="password" value="${esc(r.password||"")}" autocomplete="off" enterkeyhint="next" style="font-family:var(--mono)"><button class="btn" data-a="eye">${t("顯示")}</button><button class="btn" data-a="gen">${t("生成")}</button></div><div id="eMeter">${meter(r.password||"")}</div>
+ ${f("accountType","帳戶類型")}${f("accountName","帳號名稱")}${f("url","網站網址（自動填入用，選填）")}
+ <label for="e_password">${t("密碼")}</label><div class="pwl"><input id="e_password" type="password" value="${esc(r.password||"")}" autocomplete="off" enterkeyhint="next" style="font-family:var(--mono)"><button class="btn" data-a="eye">${t("顯示")}</button><button class="btn" data-a="cpe">${t("複製")}</button><button class="btn" data-a="gen">${t("生成")}</button></div><div id="eMeter">${meter(r.password||"")}</div>
  ${f("linkedAccount","連結帳戶")}${f("name","姓名")}
  <label for="e_notes">${t("備註（每行一筆）")}</label><textarea id="e_notes">${esc((r.notes||[]).join("\n"))}</textarea>
  <div class="fa"><button class="btn pri" data-a="save">${t("儲存")}</button><button class="btn" data-a="cancel">${t("取消")}</button></div>`;
@@ -796,13 +855,51 @@ async function bioRenew(name,pw){
  if(bioStatus()==="ok"){const r=await bioCall("enroll",name,b64(pw),t("更新生物辨識解鎖"),t("取消"));if(r.code==="ok")return toast("已更新生物辨識解鎖")}
  toast("生物辨識解鎖已停用，可稍後在「更多」重新啟用",1);
 }
+/* ---------- 自動填入（僅 AutofillAuthActivity 的 WebView，window.PwAF 存在時啟用） ---------- */
+const afReq=(()=>{try{return afApi?JSON.parse(afApi.request()):null}catch{return null}})()||{domain:"",pkg:""};
+const afHost=u=>{u=String(u||"").trim();if(!u)return"";try{if(!/^[a-z][a-z0-9+.-]*:\/\//i.test(u))u="https://"+u;return new URL(u).hostname.toLowerCase().replace(/^www\./,"")}catch{return""}};
+const afMatch=r=>{
+ const u=String(r.url||"").trim();if(!u)return false;
+ const q=String(afReq.domain||"").toLowerCase().replace(/^www\./,"");
+ if(!q)return !!afReq.pkg&&u.toLowerCase()===String(afReq.pkg).toLowerCase();
+ const h=afHost(u);
+ return !!h&&(q===h||q.endsWith("."+h));
+};
+let afRecs=[],afAll=false,afShown=[],afTimer=null;
+function afDraw(){
+ const src=afReq.domain||afReq.pkg||"";
+ $("#afSrc").textContent=src?t("請求來源：{s}",{s:src}):t("無法取得請求來源");
+ afShown=afRecs.filter(r=>afAll||afMatch(r));
+ $("#afUl").innerHTML=afShown.map((r,i)=>`<li><button class="btn full afit" data-i="${i}" type="button">${esc(r.accountName||t("（未命名）"))}<small>${esc(r.linkedAccount||r.name||afHost(r.url)||"")}</small></button></li>`).join("");
+ const w=$("#afWarn");
+ w.textContent=afAll?t("目前顯示所有紀錄，請確認請求來源是你要登入的網站或 App 再選擇。"):afShown.length?"":t("沒有符合此來源的紀錄。請在主程式為該紀錄填寫「網站網址」，或按「顯示所有紀錄」手動選擇。");
+ w.hidden=!w.textContent;
+ $("#afAll").textContent=t(afAll?"只顯示符合的紀錄":"顯示所有紀錄");
+}
+function afList(o){
+ afRecs=o.recs.slice();afAll=false;
+ $("#gate").hidden=true;$("#afp").hidden=false;afDraw();
+ clearTimeout(afTimer);afTimer=setTimeout(()=>{afRecs=[];afApi.cancel()},90000);
+}
+$("#afUl").addEventListener("click",e=>{
+ const b=e.target.closest("[data-i]");if(!b)return;
+ const r=afShown[+b.dataset.i];if(!r)return;
+ const u=String(r[cfg.afUser]||r.accountName||"");
+ try{afApi.fill(u,String(r.password||""))}catch(err){toast(t("填入失敗：{m}",{m:err.message||err}),1)}
+});
+$("#afAll").onclick=()=>{afAll=!afAll;afDraw()};
+$("#afNo").onclick=()=>{afRecs=[];afApi.cancel()};
+document.addEventListener("visibilitychange",()=>{if(afApi&&document.hidden&&!$("#afp").hidden){afRecs=[];afApi.cancel()}});
+const afSupported=()=>{try{return !!bioApi&&typeof bioApi.afEnabled!=="undefined"}catch{return false}};
+const afOn=()=>{try{return !!bioApi.afEnabled()}catch{return false}};
 async function doUnlock(name,pw,fromBio){
  try{
   const raw=storeGet(name),o=await work(t("解鎖中…"),()=>openVault(raw,pw));
   if(!o&&fromBio){bioRemove(name);refreshBio();toast("生物辨識解鎖已停用（主碼可能已變更），請以主碼解鎖後重新啟用",1)}
   if(o){
+   if(afApi){afList(o);return}
    let note=null,ses={fmt:o.fmt,salt:o.salt,keys:o.keys};
-   if(cfg.auto&&o.fmt!==cfg.fmt){
+   if(!afApi&&cfg.auto&&o.fmt!==cfg.fmt){
     const to=cfg.fmt;
     const ok=await work(t("轉換格式中…"),async()=>{
      const salt=rb(16),k=await derive(to,pw,salt),out=await seal(to,salt,k,o.recs);
@@ -871,7 +968,7 @@ $("#bLock").onclick=lock;
 $("#bNew").onclick=async()=>{
  const o=await authOpen(t("新增紀錄需要驗證主碼"));if(!o)return;
  endEdit();stopRev();S.multi=null;S.sel=null;S.mode="new";
- S.ed={fmt:o.fmt,salt:o.salt,keys:o.keys,rec:{id:null,accountType:"",accountName:"",password:generatePassword(cfg.len),linkedAccount:"",name:"",notes:[]}};
+ S.ed={fmt:o.fmt,salt:o.salt,keys:o.keys,rec:{id:null,accountType:"",accountName:"",password:generatePassword(cfg.len),linkedAccount:"",name:"",url:"",notes:[]}};
  o.recs=null;armEd();render();
 };
 $("#dt").onclick=async e=>{
@@ -894,11 +991,12 @@ $("#dt").onclick=async e=>{
   stopRev();S.mode="edit";S.ed={fmt:o.fmt,salt:o.salt,keys:o.keys,rec:{...rec,notes:[...(rec.notes||[])]}};o.recs=null;armEd();render();
  }
  else if(a==="cancel")cancelEdit();
+ else if(a==="cpe")copy($("#e_password").value);
  else if(a==="eye"){const i=$("#e_password"),h=i.type==="password";i.type=h?"text":"password";b.textContent=t(h?"隱藏":"顯示")}
  else if(a==="gen"){$("#e_password").value=generatePassword(cfg.len);$("#e_password").dispatchEvent(new Event("input",{bubbles:true}))}
  else if(a==="save"){
   const E=S.ed,g=k=>$("#e_"+k).value.trim();
-  const rec={...E.rec,id:E.rec.id||hex(rb(4)),accountType:g("accountType"),accountName:g("accountName"),linkedAccount:g("linkedAccount"),name:g("name"),password:$("#e_password").value,notes:$("#e_notes").value.split("\n").map(s=>s.trim()).filter(Boolean)};
+  const rec={...E.rec,id:E.rec.id||hex(rb(4)),accountType:g("accountType"),accountName:g("accountName"),url:g("url"),linkedAccount:g("linkedAccount"),name:g("name"),password:$("#e_password").value,notes:$("#e_notes").value.split("\n").map(s=>s.trim()).filter(Boolean)};
   if(!rec.accountName)return toast("帳號名稱不可為空",1);
   const ok=await work(t("加密儲存中…"),async()=>{
    const recs=await unseal(E.fmt,E.keys,hdr(rawVault()).body);
@@ -949,11 +1047,15 @@ $("#mDel").onclick=async()=>{
 };
 
 /* ---------- 離開頁面或進入背景：強制清除 ---------- */
-addEventListener("pagehide",()=>{if(S)lock()});
+addEventListener("pagehide",()=>{if(S&&!S.ed)lock()});
 document.addEventListener("visibilitychange",()=>{
  if(!S)return;
- if(document.hidden){stopRev();if(S.ed)cancelEdit();else renderDetail();hidT=setTimeout(()=>{if(S){lock()}},cfg.bg*1e3)}
- else clearTimeout(hidT);
+ if(document.hidden){
+  stopRev();
+  if(S.ed){const i=$("#e_password");if(i&&i.type!=="password"){i.type="password";const b=$("#dt [data-a=eye]");if(b)b.textContent=t("顯示")}armEd(3e5)}
+  else{renderDetail();hidT=setTimeout(()=>{if(S){lock()}},cfg.bg*1e3)}
+ }
+ else{clearTimeout(hidT);if(S.ed)armEd()}
 });
 
 /* ---------- 備份、CSV、刪除 ---------- */
@@ -1015,7 +1117,7 @@ $("#fCsv").onchange=async e=>{
  const col=n=>head.indexOf(n),nc=head.map((h,i)=>h.includes("備註")?i:-1).filter(i=>i>=0);
  if(!head.length||col("帳號名稱")<0)return toast("CSV 欄位需包含：帳戶類型,帳號名稱,密碼,連結帳戶,姓名,備註",1);
  const get=(r,n)=>col(n)<0?"":(r[col(n)]||"").trim();
- const add=rows.map(r=>({id:hex(rb(4)),accountType:get(r,"帳戶類型"),accountName:get(r,"帳號名稱"),password:get(r,"密碼"),linkedAccount:get(r,"連結帳戶"),name:get(r,"姓名"),
+ const add=rows.map(r=>({id:hex(rb(4)),accountType:get(r,"帳戶類型"),accountName:get(r,"帳號名稱"),password:get(r,"密碼"),linkedAccount:get(r,"連結帳戶"),name:get(r,"姓名"),url:get(r,"網址"),
   notes:nc.flatMap(i=>(r[i]||"").split(/[;；]/).map(s=>s.trim()).filter(Boolean))}));
  const o=await authOpen(t("匯入 {n} 筆 CSV 需要驗證主碼",{n:add.length}));if(!o)return;
  const ok=await work(t("加密儲存中…"),async()=>{await commit(o,o.recs.concat(add));return true});
@@ -1113,9 +1215,15 @@ function renderSet(){
  <label>${t("刪除用 PIN")}</label>
  <div class="pinrow"><span>${t(cfg.pin?"目前狀態：已設定":"目前狀態：未設定")}</span><span class="sp"></span><button class="btn mini" id="bPinSet" type="button">${t(cfg.pin?"變更 PIN":"設定 PIN")}</button>${cfg.pin?`<button class="btn mini dg" id="bPinClr" type="button">${t("移除 PIN")}</button>`:""}</div>
  <p class="hint">${t("刪除資料庫或紀錄（單筆與多選）時須輸入此 PIN。PIN 不參與加密，只能防誤刪與旁人操作，不能保護資料內容。")}</p>
- <div class="fa"><button class="btn dg" id="sReset" type="button">${t("還原預設值")}</button><span class="sp"></span><button class="btn pri" id="sClose" type="button">${t("完成")}</button></div>`;
+   ${afSupported()?`<h4>${t("自動填入")}</h4>
+  <div class="pinrow"><span>${t(afOn()?"目前狀態：已啟用":"目前狀態：未啟用")}</span><span class="sp"></span><button class="btn mini" id="bAfSet" type="button">${t("開啟系統設定")}</button></div>
+  <label for="sAfUser">${t("填入的帳號欄位")}</label><select id="sAfUser">${opt("accountName",t("帳號名稱"),cfg.afUser)}${opt("linkedAccount",t("連結帳戶"),cfg.afUser)}</select>
+  <p class="hint">${t("啟用後，請在 Chrome 設定的「自動填入服務」選「使用其他服務自動填入」。紀錄需填寫「網站網址」才會自動比對；每次填入都要先解鎖。")}</p>`:""}
+  <div class="fa"><button class="btn dg" id="sReset" type="button">${t("還原預設值")}</button><span class="sp"></span><button class="btn pri" id="sClose" type="button">${t("完成")}</button></div>`;
 }
 $("#bSet").onclick=()=>{renderSet();$("#dlgSet").showModal()};
+$("#dlgSet").addEventListener("click",e=>{if(e.target.id==="bAfSet"){try{bioApi.afSettings()}catch{}}});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&$("#dlgSet").open&&afSupported())renderSet()});
 $("#dlgSet").addEventListener("input",e=>{if(e.target.id==="sLen")$("#sLenN").textContent=e.target.value});
 $("#dlgSet").addEventListener("change",async e=>{
  const el=e.target,id=el.id;
@@ -1130,6 +1238,7 @@ $("#dlgSet").addEventListener("change",async e=>{
  else if(id==="sRev")cfg.rev=+el.value;
  else if(id==="sReauth"){cfg.reauth=el.checked;if(cfg.reauth&&S)S.ses=null}
  else if(id==="sClip")cfg.clip=el.checked;
+  else if(id==="sAfUser")cfg.afUser=el.value;
  else return;
  await cfgSave();
  if(id==="sWeak"&&S)render();
@@ -1176,12 +1285,14 @@ window.__pwBack=()=>{
 addEventListener("error",e=>toast(t("錯誤：{m}",{m:e.message||e}),1));
 addEventListener("unhandledrejection",e=>toast(t("錯誤：{m}",{m:(e.reason&&e.reason.message)||e.reason}),1));
 trDom();
-if(tauriApi){$("#uSel").innerHTML="<option>"+t("載入設定檔中…")+"</option>";$("#bUnlock").disabled=true}
+if(afApi)document.body.classList.add("af");
+if(tauriApi||afApi){$("#uSel").innerHTML="<option>"+t("載入設定檔中…")+"</option>";$("#bUnlock").disabled=true}
 Promise.all([cfgLoad(),storeInit().catch(e=>toast(t("讀取資料庫失敗：{m}",{m:e.message||e}),1))]).then(async()=>{
  $("#cFmt").value=cfg.fmt;
  applyLang();
  try{await cfgFlag()}catch{}
  $("#bUnlock").disabled=false;refreshGate();
+  if(afApi&&!profiles().length){toast("尚無設定檔，請先建立",1);setTimeout(()=>afApi.cancel(),1800)}
  console.log("[PW] storeInit 完成："+vaultCache.size+" 個設定檔，"+Math.round(performance.now())+" ms");
 });
 </script>

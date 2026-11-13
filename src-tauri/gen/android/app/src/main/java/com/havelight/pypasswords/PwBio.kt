@@ -1,6 +1,10 @@
 package com.havelight.pypasswords
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import android.view.autofill.AutofillManager
 import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyPermanentlyInvalidatedException
@@ -175,6 +179,29 @@ class PwBio(private val activity: FragmentActivity, private val webView: WebView
         reply(id, "invalidated")
       } catch (e: Exception) {
         reply(id, "error", e.javaClass.simpleName)
+      }
+    }
+  }
+
+  @JavascriptInterface
+  fun afEnabled(): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+    return try {
+      activity.getSystemService(AutofillManager::class.java)?.hasEnabledAutofillServices() == true
+    } catch (e: Exception) {
+      false
+    }
+  }
+
+  @JavascriptInterface
+  fun afSettings() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+    activity.runOnUiThread {
+      try {
+        activity.startActivity(
+          Intent(Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE, Uri.parse("package:" + activity.packageName))
+        )
+      } catch (e: Exception) {
       }
     }
   }

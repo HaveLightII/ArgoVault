@@ -82,3 +82,10 @@ dependencies {
 }
 
 apply(from = file("tauri.build.gradle.kts"))
+
+tasks.register<Copy>("syncAutofillAsset") {
+    from("../../../../src/index.html")
+    into("src/main/assets")
+    rename("index.html", "argovault-af.html")
+}
+tasks.matching { it.name == "preBuild" }.configureEach { dependsOn("syncAutofillAsset") }

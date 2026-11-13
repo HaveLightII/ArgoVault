@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:minHeight="56dp"
+    android:minWidth="200dp"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingLeft="16dp"
+    android:paddingRight="20dp"
+    android:paddingTop="10dp"
+    android:paddingBottom="10dp"
+    android:background="#234E70">
+
+    <ImageView
+        android:id="@+id/afIcon"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:src="@mipmap/ic_launcher" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="12dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/afTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/afSub"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#CFE0EE"
+            android:textSize="13sp" />
+    </LinearLayout>
+</LinearLayout>

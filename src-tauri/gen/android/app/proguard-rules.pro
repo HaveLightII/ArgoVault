@@ -22,3 +22,7 @@
 -keepclassmembers class com.havelight.pypasswords.PwBio {
     @android.webkit.JavascriptInterface <methods>;
 }
+
+-keepclassmembers class com.havelight.pypasswords.PwAF {
+    @android.webkit.JavascriptInterface <methods>;
+}
