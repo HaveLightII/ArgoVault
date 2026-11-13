@@ -3,7 +3,7 @@ name = "pypasswords"
 version = "0.1.0"
 description = "離線多設定檔密碼管理程式"
 authors = ["HaveLightII"]
-edition = "2026"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
