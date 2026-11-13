@@ -30,3 +30,4 @@ keystore.properties
 *.tmp
 .env
 .env.*
+src-tauri/gen/android/app/src/main/assets/argovault-af.html
