@@ -16,8 +16,8 @@
 | 查看密碼前是否再輸入主碼（`reauth`） | 實機 OK |
 | 生物辨識解鎖 | 實機 OK |
 | 改名 ArgoVault | 倉庫與 `strings.xml`、`tauri.conf.json` 已改並建置安裝；使用者未回報桌面名稱 |
-| 瀏覽器自動填入 | 實機：已啟用、出現建議、解鎖正常、僅列符合紀錄、一次點擊即填入；建議按鈕原本是看不清的空白方塊，已改自訂版面（待確認） |
-| 編輯前主碼對話框生物辨識、編輯頁複製鈕、編輯中離開不鎖庫 | 2026-11-13 完成，容器 Playwright 通過，待實機 |
+| 瀏覽器自動填入 | 實機 OK：已啟用、建議（自訂版面）清楚可見、解鎖正常、僅列符合紀錄、一次點擊即填入 |
+| 編輯前主碼對話框生物辨識、編輯頁複製鈕、編輯中離開不鎖庫 | 實機 OK（2026-11-13） |
 
 ## 2. 使用者偏好（需遵守）
 
@@ -134,7 +134,7 @@ JS `window.__pwBack()` 回傳 `true` 表示已處理；`MainActivity` 以 `OnBac
 - 包裝主碼而非衍生金鑰：轉換格式與重新加鹽不會使其失效。主碼變更後前端以新主碼重新註冊（取消則停用）；新增指紋、密文遺失、解密後無法開庫都會清除註冊並提示。建立同名、匯入覆蓋、刪除設定檔也清除。  
 - 回傳協定：`window.__pwBioDone(id, code, data)`；`code` 為 `ok`、`cancel`、`lockout`、`missing`、`invalidated`、`error`。只接受 `BIOMETRIC_STRONG`（許多裝置的臉部辨識只屬 Class 2，不符）；主碼的 base64 字串會短暫存在於 JS 堆積。威脅模型：便利功能，強度低於主碼（Android Developers, n.d.-a）。  
 
-### 6.5 瀏覽器自動填入（已建置安裝，待實機驗證）
+### 6.5 瀏覽器自動填入（實機 OK）
 
 流程：Chrome 登入頁點欄位 → 系統顯示「ArgoVault」建議 → `AutofillAuthActivity` 解鎖（主碼或指紋）→ 顯示網址符合的紀錄 → 點選後回傳 `Dataset`，欄位被填入。  
 
@@ -178,11 +178,11 @@ adb install --no-incremental -r src-tauri/gen/android/app/build/outputs/apk/univ
 - Worker 實測：總時間不變（約 1.7 秒），但運算期間畫面不再凍結（最大影格間隔由 1670 ms 降至 約 18 ms），故採用。  
 - 實機（三星，arm64，release APK）：基本功能、設定、Enter、狀態列、轉換、匯出入、變更主碼、多選刪除、PIN、返回鍵、圖示皆 OK；`reauth` 與生物辨識 OK；自動填入版 APK 成功建置與安裝。  
 
-### 8.2 自動填入實機結果與待確認項目
+### 8.2 自動填入實機結果
 
-2026-11-13 使用者回報第 1 至 4 項通過（已啟用、有建議、解鎖正常、只列符合紀錄、一次點擊）；建議外觀已修（見 6.5），待重建後確認。第 5 至 7 項尚未回報。
+2026-11-13 實機：第 1 至 4 項與第 7 項（APK 內有 `argovault-af.html`）通過，建議按鈕外觀修正後正常。第 5 項（自家登入畫面不出現建議、無設定檔時提示）、第 6 項（失敗蒐集用）尚未實測。
 
-原檢查清單：
+檢查清單：
 
 1. 設定頁狀態顯示「已啟用」；Chrome 已選「使用其他服務自動填入」。  
 2. 紀錄填了「網站網址」後，登入頁點欄位出現「ArgoVault」建議。  
@@ -221,6 +221,7 @@ adb install --no-incremental -r src-tauri/gen/android/app/build/outputs/apk/univ
 ## 11. Git
 
 - 倉庫 `HaveLightII/ArgoVault`，遠端為 SSH，`main` 已推送。`src-tauri/gen/android`、`src-tauri/icons`、`app-icon.png`、兩個 lock 檔納入版控；絕不納入金鑰（`*.jks`、`*.keystore`、`keystore.properties`）、`*.apk`、`*.dmg`、`node_modules`、`src-tauri/target`、vault 資料（`*.bin`、`*.sha256`、`*.bak`、`*.tmp`），規則在根目錄 `.gitignore`。  
+- 2026-11-13 提交 `a7bee98` 才首次納入自動填入相關檔案（先前一直是未追蹤或未提交）。`src-tauri/gen/android/app/src/main/assets/argovault-af.html` 是 `syncAutofillAsset` 每次建置從 `src/index.html` 複製的產物，應列入 `.gitignore` 並 `git rm --cached`（已建議，待使用者執行）。
 - 待清：根目錄的 `index.html.before-patch`（舊備份，已被追蹤）建議 `git rm`。  
 - 提交前檢查：`git ls-files | grep -E '\.(bin|jks|keystore|apk|dmg|sha256)$'` 不應有輸出。  
 
@@ -254,7 +255,7 @@ tar -czf ~/ArgoVault_min_$(date +%Y%m%d).tar.gz ArgoVault_HANDOFF.md README.md s
 - 2026-11-11：改名 ArgoVault；新增 `reauth` 設定；新增生物辨識解鎖（實機 OK）。  
 - 2026-11-12：桌面名稱（`strings.xml`、`tauri.conf.json`）改為 ArgoVault 並推送；README 與交接文件進倉庫；新增自動填入（方案 A）並成功建置安裝，待實機測試；本文件精簡重寫（移除內嵌程式碼與歷史敘事，改附快照）。  
 
-- 2026-11-13：自動填入實機驗證通過；建議按鈕改自訂版面；編輯前主碼對話框加生物辨識；編輯頁加密碼複製鈕；編輯中切背景不鎖庫（見 9）。
+- 2026-11-13：自動填入實機驗證通過；建議按鈕改自訂版面；編輯前主碼對話框加生物辨識；編輯頁加密碼複製鈕；編輯中切背景不鎖庫（見 9）；三項皆實機通過，自動填入相關檔案首次提交（`a7bee98`）。
 
 ## 參考資料
 
