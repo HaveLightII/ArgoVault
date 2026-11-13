@@ -32,3 +32,4 @@ keystore.properties
 .env.*
 src-tauri/gen/android/app/src/main/assets/argovault-af.html
 .vscode/
+.vscode/
