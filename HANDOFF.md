@@ -20,7 +20,7 @@
 | 編輯前主碼對話框生物辨識、編輯頁複製鈕、編輯中離開不鎖庫 | 實機 OK（2026-11-13） |
 | macOS 生物辨識解鎖（Touch ID，見 6.6） | 實機 OK（2026-11-14） |
 | macOS 自動填入 | 2026-11-14 決定放棄（無 Xcode 與簽署憑證） |
-| Windows 版 | 建置步驟見 7.1，含 Windows Hello 生物辨識解鎖（6.7）；尚未在 Windows 實機建置與測試 |
+| Windows 版 | 建置步驟見 7.1，含 Windows Hello 生物辨識解鎖（6.7）；實機建置與測試 OK（2026-11-14） |
 | Windows 自動填入 | 2026-11-14 決定暫緩，待生物辨識實機通過後再議（候選：全域快速鍵自動輸入、瀏覽器擴充功能） |
 
 ## 2. 使用者偏好（需遵守）
@@ -182,16 +182,16 @@ adb install --no-incremental -r src-tauri/gen/android/app/build/outputs/apk/univ
 - macOS：`npm run tauri build -- --bundles app` 產生 `src-tauri/target/release/bundle/macos/ArgoVault.app`（ad-hoc 簽署，已驗證可建置與啟動；最低系統版本 11.0）；`.dmg`（`--bundles app,dmg`）可建置；視窗寬度低於 820 會顯示手機版面；禁止截圖與返回鍵只在 Android 有效。  
 - 編譯警告（`setValue` 棄用、AGP 的 `android.newDsl` 等）皆可忽略。  
 
-### 6.7 Windows 生物辨識解鎖（Windows Hello，未實測）
+### 6.7 Windows 生物辨識解鎖（Windows Hello，實機 OK）
 
 - 同樣包裝主碼，command 與前端 shim 與 6.6 共用；實作在 `lib.rs` 的 `bio::imp`（`cfg(target_os = "windows")`），相依 `windows`、`aes-gcm`、`sha2`（僅 Windows 目標）。  
-- 做法：每設定檔一把 `KeyCredential`（名稱 `ArgoVault-<設定檔>`，有 TPM 時由硬體保護），對隨機 32 位元組挑戰值 `RequestSignAsync`（觸發 Windows Hello），以 SHA-256(`"ArgoVault-bio-v1"` 加簽章) 為 AES-256-GCM 金鑰加密主碼；挑戰值、nonce、密文存 `<AppData>\bio\<設定檔>.bio`（Microsoft, n.d.）。前提是簽章為確定性（RSA PKCS#1 v1.5），未在實機確認。  
+- 做法：每設定檔一把 `KeyCredential`（名稱 `ArgoVault-<設定檔>`，有 TPM 時由硬體保護），對隨機 32 位元組挑戰值 `RequestSignAsync`（觸發 Windows Hello），以 SHA-256(`"ArgoVault-bio-v1"` 加簽章) 為 AES-256-GCM 金鑰加密主碼；挑戰值、nonce、密文存 `<AppData>\bio\<設定檔>.bio`（Microsoft, n.d.）。前提是簽章為確定性（RSA PKCS#1 v1.5）；實機解鎖成功，與此相符。  
 - 回傳碼：使用者取消或選擇密碼為 `cancel`，裝置鎖定為 `lockout`，金鑰不存在或解密失敗為 `invalidated`。`status` 依 `IsSupportedAsync`，未設定 Windows Hello 時為 `unenrolled`。  
 - 啟用時預期跳兩次 Windows Hello（建立金鑰一次、簽章一次）；對話框無法自訂說明文字。`focusPrompt` 會輪詢 `Credential Dialog Xaml Host` 視窗並帶到前景，避免對話框開在 App 後方。  
-- 驗證狀態：Windows 專屬程式碼已在 macOS 上以 `cargo check --target x86_64-pc-windows-msvc` 通過型別檢查（獨立小專案，因主專案的資源編譯需要 Windows 工具）；完整建置、連結與執行皆未驗證。  
-- 實機待測：啟用（跳幾次、是否在前景）、解鎖、取消、未設定 Windows Hello 時的提示、變更主碼後更新、停用後金鑰是否刪除。  
+- 驗證狀態：Windows 專屬程式碼已在 macOS 上以 `cargo check --target x86_64-pc-windows-msvc` 通過型別檢查（獨立小專案，因主專案的資源編譯需要 Windows 工具）；之後使用者回報 Windows 實機實測通過（2026-11-14；檢查項目：建置、啟用、Windows Hello 解鎖、取消後以主碼解鎖、基本功能）。  
+- 未實測：未設定 Windows Hello 時的提示、變更主碼後更新、停用後金鑰是否刪除。  
 
-### 7.1 Windows 建置（未驗證）
+### 7.1 Windows 建置（實機 OK）
 
 前置（Tauri, n.d.-b）：Microsoft C++ Build Tools（勾選「使用 C++ 的桌面開發」）、WebView2 Runtime（Windows 10 1803 以上與 Windows 11 已內建）、Rust（`stable-msvc` 工具鏈）、Node.js LTS、Git。於 PowerShell 執行：
 
@@ -212,7 +212,6 @@ npm run tauri build
 - 生物辨識為 Windows Hello（6.7）；無自動填入；禁止截圖與返回鍵只在 Android 有效。  
 - 安裝檔未簽署，SmartScreen 會警告。  
 - `.gitattributes` 固定 `src/index.html` 為 LF，避免 Git for Windows 轉成 CRLF。  
-- 建置後待測：建立與解鎖、匯出入備份（系統檔案對話框）、變更主碼與轉換格式（涉及暫存檔改名覆蓋）、剪貼簿、閒置與背景鎖定、Windows Hello（6.7）。  
 
 ## 8. 驗證狀態
 
@@ -242,7 +241,7 @@ npm run tauri build
 - 匯出的 `.bin` 與 `.sha256` 以 `sha256sum` 比對、以原 Python 版解密；JS 寫出的 PWV2 由 Python 解密。  
 - Android SAF 寫入是否截斷既有檔、`defaultPath` 是否生效；系統檔案對話框讓 App 進背景時為何不觸發 `pagehide` 鎖定（實測正常，原因未確認）。  
 - 禁止截圖的最近工作畫面縮圖細節；重開偶發卡頓的真正原因（目前未再重現，復發時收集 `adb logcat -v time | grep -iE "\[PW\]|pypasswords|AndroidRuntime|FATAL|ANR|chromium|tauri"`）。  
-- `allowBackup` 預設值；自有金鑰簽署；Windows 建置與執行（見 7.1）；macOS 改過程式碼再重建後舊註冊是否仍可用、新增指紋後註冊失效（見 6.6）。  
+- `allowBackup` 預設值；自有金鑰簽署；Windows Hello 的次要情境（見 6.7）；macOS 改過程式碼再重建後舊註冊是否仍可用、新增指紋後註冊失效（見 6.6）。  
 
 ## 9. 已知限制與待辦
 
@@ -302,7 +301,7 @@ tar -czf ~/ArgoVault_min_$(date +%Y%m%d).tar.gz HANDOFF.md README.md src/index.h
 
 - 2026-11-13：自動填入實機驗證通過；建議按鈕改自訂版面；編輯前主碼對話框加生物辨識；編輯頁加密碼複製鈕；編輯中切背景不鎖庫（見 9）；三項皆實機通過，自動填入相關檔案首次提交（`a7bee98`）。
 - 2026-11-14：放棄 macOS 自動填入；新增 macOS 生物辨識解鎖（Touch ID 加 Secure Enclave，見 6.6），實機通過。清單頁按返回鍵改為只鎖定、不退出 App（實機 OK，APK 於 macOS 主機建置）。版本改為 0.1.1（`tauri.conf.json`、`Cargo.toml`、`package.json` 與兩個 lock 檔），發佈 GitHub Release `0.1.1`（附 APK 與 arm64 `.dmg`；`.dmg` 建置已驗證，`.deb` 須在 Ubuntu 建置，未附）。  
-- 2026-11-14：新增 Windows 建置說明（7.1）、`.gitattributes`，`.gitignore` 加 `*.msi`、`*.exe`、`*.deb`；新增 Windows Hello 生物辨識解鎖（6.7，僅通過型別檢查）；Windows 自動填入暫緩。  
+- 2026-11-14：新增 Windows 建置說明（7.1）、`.gitattributes`，`.gitignore` 加 `*.msi`、`*.exe`、`*.deb`；新增 Windows Hello 生物辨識解鎖（6.7），Windows 實機建置與測試通過；Windows 自動填入暫緩。  
 
 ## 參考資料
 
