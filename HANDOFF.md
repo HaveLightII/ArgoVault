@@ -20,7 +20,8 @@
 | 編輯前主碼對話框生物辨識、編輯頁複製鈕、編輯中離開不鎖庫 | 實機 OK（2026-11-13） |
 | macOS 生物辨識解鎖（Touch ID，見 6.6） | 實機 OK（2026-11-14） |
 | macOS 自動填入 | 2026-11-14 決定放棄（無 Xcode 與簽署憑證） |
-| Windows 版 | 建置步驟見 7.1；尚未在 Windows 實機建置與測試 |
+| Windows 版 | 建置步驟見 7.1，含 Windows Hello 生物辨識解鎖（6.7）；尚未在 Windows 實機建置與測試 |
+| Windows 自動填入 | 2026-11-14 決定暫緩，待生物辨識實機通過後再議（候選：全域快速鍵自動輸入、瀏覽器擴充功能） |
 
 ## 2. 使用者偏好（需遵守）
 
@@ -101,7 +102,7 @@
 - `authOpen(reason, soft)`：`soft` 為真（只有查看密碼）、`reauth` 為假且 `S.ses` 與檔頭 `fmt`、`salt` 相符時，直接 `unseal`，否則退回詢問主碼；成功後若 `reauth` 為假就快取金鑰。  
 - `ask(reason, bio)`：`bio` 為真且該設定檔已註冊生物辨識時，`#dlgAuth` 顯示「生物辨識驗證」鈕，成功即以主碼位元組走原流程；只有 `authOpen` 傳 `true`（查看、新增、編輯、刪除、匯入 CSV 皆可用，啟用生物辨識與變更主碼不用）。失敗訊息顯示在對話框內 `#aErr`（對話框在 top layer，`toast` 會被蓋住）；驗證後主碼無法開庫則停用註冊。
 - 解鎖流程為 `doUnlock(name, pw, fromBio)`（主碼與生物辨識共用）；生物辨識解鎖後無法開庫（主碼已變）會自動停用該設定檔的註冊。  
-- 橋接物件（不存在時相關按鈕隱藏）：`window.PwBio`（生物辨識與自動填入設定；Android 為原生橋接，macOS Tauri 為前端 shim，見 6.6）、`window.PwAF`（僅 Android）（自動填入模式，`body.af`，只讀，解鎖後 `afList` 顯示比對清單，不建立 `S`）。  
+- 橋接物件（不存在時相關按鈕隱藏）：`window.PwBio`（生物辨識與自動填入設定；Android 為原生橋接，macOS 與 Windows Tauri 為前端 shim，見 6.6、6.7）、`window.PwAF`（僅 Android）（自動填入模式，`body.af`，只讀，解鎖後 `afList` 顯示比對清單，不建立 `S`）。  
 - 過去的陷阱：`lock()` 內不可引用不存在的元素 ID；鍵盤 `onkeydown` 對非 Enter 鍵不可 `return false`（會擋住倒退刪字）；`unseal` 最小長度 28。  
 
 ## 6. Android 整合
@@ -154,8 +155,8 @@ JS `window.__pwBack()` 回傳 `true` 表示已處理；`MainActivity` 以 `OnBac
 
 - 設計等同 6.4：包裝主碼而非衍生金鑰。`src-tauri/macos/bio.swift` 以 CryptoKit 建立每設定檔一把 Secure Enclave P-256 金鑰（存取控制 `privateKeyUsage` 加 `biometryCurrentSet`），與一次性軟體金鑰做 ECDH，經 HKDF-SHA256 得 AES-256-GCM 金鑰加密主碼（Apple, n.d.）。金鑰資料、一次性公鑰、密文與註冊當下的生物辨識狀態雜湊存 `<AppData>/bio/<設定檔>.bio`（JSON，權限 600）；金鑰資料只有本機 Secure Enclave 能用。  
 - 流程：先 `LAContext.evaluatePolicy`（僅生物辨識，不提供密碼後備），同一個 context 交給金鑰使用，預期只跳一次 Touch ID。啟用時會立即解密比對一次。狀態雜湊與註冊時不同即回 `invalidated`。  
-- 串接：`build.rs` 在目標為 macOS 時以 `swiftc` 編成靜態庫 `libargobio.a` 並連結（不需 Xcode 與 `swift-rs`）；`lib.rs` 的 `bio` 模組提供 command `bio_init`、`bio_remove`、`bio_enroll`、`bio_unlock`（皆 `#[tauri::command(async)]`，不可在主執行緒呼叫，否則 Touch ID 對話框會卡死）。  
-- 前端：`window.PwBio` 不存在、為 Tauri 且 User-Agent 含 `Macintosh` 時注入同協定 shim（`mac:true`）；`status()`、`has()` 是同步呼叫，由啟動時的 `bioInit()` 載入快取 `macBio`。Touch ID 對話框文字為「ArgoVault 正在嘗試」加上 shim 傳入的理由字串（已加進 `EN`）。  
+- 串接：`build.rs` 在目標為 macOS 時以 `swiftc` 編成靜態庫 `libargobio.a` 並連結（不需 Xcode 與 `swift-rs`）；`lib.rs` 的 `bio` 模組（平台實作在子模組 `imp`，macOS 與 Windows 各一份）提供 command `bio_init`、`bio_remove`、`bio_enroll`、`bio_unlock`（皆 `#[tauri::command(async)]`，不可在主執行緒呼叫，否則 Touch ID 對話框會卡死）。  
+- 前端：`window.PwBio` 不存在、為 Tauri 且 User-Agent 含 `Macintosh` 或 `Windows NT` 時注入同協定 shim（`desktop:true`）；`status()`、`has()` 是同步呼叫，由啟動時的 `bioInit()` 載入快取 `macBio`。Touch ID 對話框文字為「ArgoVault 正在嘗試」加上 shim 傳入的理由字串（已加進 `EN`）。  
 - 已實測（2026-11-14）：ad-hoc 簽署的程式可建立並還原 Secure Enclave 金鑰；release `.app` 建置成功並可啟動；使用者回報實測通過（檢查項目：啟用時 Touch ID 只跳一次、Touch ID 解鎖、取消後仍可用主碼；原始碼未變動下重建 App 後舊註冊仍可解鎖）。未實測：改過程式碼再重建後舊註冊是否仍可用、新增指紋後失效。  
 - 已知限制：無 Touch ID 的 Mac 狀態為 `nohw`，按鈕仍顯示但會提示無法使用；`.bio` 檔不隨備份匯出，換機須重新啟用。  
 
@@ -181,6 +182,15 @@ adb install --no-incremental -r src-tauri/gen/android/app/build/outputs/apk/univ
 - macOS：`npm run tauri build -- --bundles app` 產生 `src-tauri/target/release/bundle/macos/ArgoVault.app`（ad-hoc 簽署，已驗證可建置與啟動；最低系統版本 11.0）；`.dmg`（`--bundles app,dmg`）可建置；視窗寬度低於 820 會顯示手機版面；禁止截圖與返回鍵只在 Android 有效。  
 - 編譯警告（`setValue` 棄用、AGP 的 `android.newDsl` 等）皆可忽略。  
 
+### 6.7 Windows 生物辨識解鎖（Windows Hello，未實測）
+
+- 同樣包裝主碼，command 與前端 shim 與 6.6 共用；實作在 `lib.rs` 的 `bio::imp`（`cfg(target_os = "windows")`），相依 `windows`、`aes-gcm`、`sha2`（僅 Windows 目標）。  
+- 做法：每設定檔一把 `KeyCredential`（名稱 `ArgoVault-<設定檔>`，有 TPM 時由硬體保護），對隨機 32 位元組挑戰值 `RequestSignAsync`（觸發 Windows Hello），以 SHA-256(`"ArgoVault-bio-v1"` 加簽章) 為 AES-256-GCM 金鑰加密主碼；挑戰值、nonce、密文存 `<AppData>\bio\<設定檔>.bio`（Microsoft, n.d.）。前提是簽章為確定性（RSA PKCS#1 v1.5），未在實機確認。  
+- 回傳碼：使用者取消或選擇密碼為 `cancel`，裝置鎖定為 `lockout`，金鑰不存在或解密失敗為 `invalidated`。`status` 依 `IsSupportedAsync`，未設定 Windows Hello 時為 `unenrolled`。  
+- 啟用時預期跳兩次 Windows Hello（建立金鑰一次、簽章一次）；對話框無法自訂說明文字。`focusPrompt` 會輪詢 `Credential Dialog Xaml Host` 視窗並帶到前景，避免對話框開在 App 後方。  
+- 驗證狀態：Windows 專屬程式碼已在 macOS 上以 `cargo check --target x86_64-pc-windows-msvc` 通過型別檢查（獨立小專案，因主專案的資源編譯需要 Windows 工具）；完整建置、連結與執行皆未驗證。  
+- 實機待測：啟用（跳幾次、是否在前景）、解鎖、取消、未設定 Windows Hello 時的提示、變更主碼後更新、停用後金鑰是否刪除。  
+
 ### 7.1 Windows 建置（未驗證）
 
 前置（Tauri, n.d.-b）：Microsoft C++ Build Tools（勾選「使用 C++ 的桌面開發」）、WebView2 Runtime（Windows 10 1803 以上與 Windows 11 已內建）、Rust（`stable-msvc` 工具鏈）、Node.js LTS、Git。於 PowerShell 執行：
@@ -197,12 +207,12 @@ npm run tauri build
 3：安裝 Tauri CLI。  
 4：建置；首次會自動下載 WiX 與 NSIS。產物在 `src-tauri\target\release\bundle\msi\`（`.msi`）與 `bundle\nsis\`（`-setup.exe`），免安裝執行檔為 `src-tauri\target\release\pypasswords.exe`。  
 
-- 程式無 Windows 專屬程式碼：`build.rs` 與 `lib.rs` 的生物辨識只在目標為 macOS 時編譯，其他平台不註冊 command（此路徑已由 Android 建置確認可編譯；Windows 目標本身未編譯過）。  
+- `build.rs` 的 Swift 編譯只在目標為 macOS 時執行；Windows 專屬程式碼只有 6.7 的生物辨識。  
 - 資料位置預期為 `%APPDATA%\com.havelight.pypasswords\`（`vault\`、`settings.json`）。  
-- 無生物辨識（未實作 Windows Hello）、無自動填入，相關按鈕不顯示；禁止截圖與返回鍵只在 Android 有效。  
+- 生物辨識為 Windows Hello（6.7）；無自動填入；禁止截圖與返回鍵只在 Android 有效。  
 - 安裝檔未簽署，SmartScreen 會警告。  
 - `.gitattributes` 固定 `src/index.html` 為 LF，避免 Git for Windows 轉成 CRLF。  
-- 建置後待測：建立與解鎖、匯出入備份（系統檔案對話框）、變更主碼與轉換格式（涉及暫存檔改名覆蓋）、剪貼簿、閒置與背景鎖定。  
+- 建置後待測：建立與解鎖、匯出入備份（系統檔案對話框）、變更主碼與轉換格式（涉及暫存檔改名覆蓋）、剪貼簿、閒置與背景鎖定、Windows Hello（6.7）。  
 
 ## 8. 驗證狀態
 
@@ -292,7 +302,7 @@ tar -czf ~/ArgoVault_min_$(date +%Y%m%d).tar.gz HANDOFF.md README.md src/index.h
 
 - 2026-11-13：自動填入實機驗證通過；建議按鈕改自訂版面；編輯前主碼對話框加生物辨識；編輯頁加密碼複製鈕；編輯中切背景不鎖庫（見 9）；三項皆實機通過，自動填入相關檔案首次提交（`a7bee98`）。
 - 2026-11-14：放棄 macOS 自動填入；新增 macOS 生物辨識解鎖（Touch ID 加 Secure Enclave，見 6.6），實機通過。清單頁按返回鍵改為只鎖定、不退出 App（實機 OK，APK 於 macOS 主機建置）。版本改為 0.1.1（`tauri.conf.json`、`Cargo.toml`、`package.json` 與兩個 lock 檔），發佈 GitHub Release `0.1.1`（附 APK 與 arm64 `.dmg`；`.dmg` 建置已驗證，`.deb` 須在 Ubuntu 建置，未附）。  
-- 2026-11-14：新增 Windows 建置說明（7.1）、`.gitattributes`，`.gitignore` 加 `*.msi`、`*.exe`、`*.deb`。  
+- 2026-11-14：新增 Windows 建置說明（7.1）、`.gitattributes`，`.gitignore` 加 `*.msi`、`*.exe`、`*.deb`；新增 Windows Hello 生物辨識解鎖（6.7，僅通過型別檢查）；Windows 自動填入暫緩。  
 
 ## 參考資料
 
@@ -301,5 +311,6 @@ tar -czf ~/ArgoVault_min_$(date +%Y%m%d).tar.gz HANDOFF.md README.md src/index.h
 - Android Developers. (n.d.-b). *Build autofill services*. Google. https://developer.android.com/identity/autofill/autofill-services  
 - Android Developers Blog. (2024, October 16). *Chrome on Android to support third-party autofill services natively*. Google. https://android-developers.googleblog.com/2024/10/chrome-3p-autofill-services.html  
 - GitHub Docs. (n.d.). *Renaming a repository*. GitHub. https://docs.github.com/en/repositories/creating-and-managing-repositories/renaming-a-repository  
+- Microsoft. (n.d.). *KeyCredentialManager class*. Microsoft Learn. https://learn.microsoft.com/en-us/uwp/api/windows.security.credentials.keycredentialmanager  
 - Tauri. (n.d.-a). *Biometric*. https://v2.tauri.app/fr/plugin/biometric/  
 - Tauri. (n.d.-b). *Prerequisites*. https://v2.tauri.app/start/prerequisites/  

@@ -839,13 +839,13 @@ $("#uPw").addEventListener("keydown",e=>{if(isEnter(e)){e.preventDefault();$("#b
 $("#cPw2").addEventListener("keydown",e=>{if(isEnter(e)){e.preventDefault();$("#bCreate").click()}});
 $("#pwNew2").addEventListener("keydown",e=>{if(isEnter(e)){e.preventDefault();$("#pwOk").click()}});
 $("#iName").addEventListener("keydown",e=>{if(isEnter(e)){e.preventDefault();if(!$("#iOk").disabled)$("#iOk").click()}});
-/* ---------- 生物辨識（Android 橋接 PwBio；macOS 為下方 shim；其他平台沒有此物件，相關按鈕不會出現） ---------- */
-/* macOS（Tauri）：以 Rust command 提供同協定的 PwBio；status、has 為同步呼叫，故啟動時由 bioInit 載入快取 */
+/* ---------- 生物辨識（Android 橋接 PwBio；macOS 與 Windows 為下方 shim；其他平台沒有此物件，相關按鈕不會出現） ---------- */
+/* macOS 與 Windows（Tauri）：以 Rust command 提供同協定的 PwBio；status、has 為同步呼叫，故啟動時由 bioInit 載入快取 */
 const macBio={status:"none",has:new Set()};
-const bioInit=async()=>{if(!window.PwBio||!window.PwBio.mac)return;try{const r=await tauriApi.core.invoke("bio_init");macBio.status=String(r.status);macBio.has=new Set(r.profiles)}catch{}};
-if(tauriApi&&!window.PwBio&&/Macintosh/.test(navigator.userAgent)){
+const bioInit=async()=>{if(!window.PwBio||!window.PwBio.desktop)return;try{const r=await tauriApi.core.invoke("bio_init");macBio.status=String(r.status);macBio.has=new Set(r.profiles)}catch{}};
+if(tauriApi&&!window.PwBio&&/Macintosh|Windows NT/.test(navigator.userAgent)){
  const done=(id,r,data)=>window.__pwBioDone(id,r.code,r.code==="ok"?data:r.msg||"");
- window.PwBio={mac:true,
+ window.PwBio={desktop:true,
   status:()=>macBio.status,
   has:n=>macBio.has.has(n),
   remove:n=>{macBio.has.delete(n);tauriApi.core.invoke("bio_remove",{profile:n}).catch(()=>{})},
