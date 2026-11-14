@@ -20,6 +20,7 @@
 | 編輯前主碼對話框生物辨識、編輯頁複製鈕、編輯中離開不鎖庫 | 實機 OK（2026-11-13） |
 | macOS 生物辨識解鎖（Touch ID，見 6.6） | 實機 OK（2026-11-14） |
 | macOS 自動填入 | 2026-11-14 決定放棄（無 Xcode 與簽署憑證） |
+| Windows 版 | 建置步驟見 7.1；尚未在 Windows 實機建置與測試 |
 
 ## 2. 使用者偏好（需遵守）
 
@@ -131,7 +132,7 @@ JS `window.__pwBack()` 回傳 `true` 表示已處理；`MainActivity` 以 `OnBac
 
 ### 6.4 生物辨識解鎖（已實機驗證）
 
-- 不用 Tauri 外掛。官方 `tauri-plugin-biometric` 只回傳成功或失敗、不保管金鑰，無法解開 vault（Tauri, n.d.）；改為自寫橋接。  
+- 不用 Tauri 外掛。官方 `tauri-plugin-biometric` 只回傳成功或失敗、不保管金鑰，無法解開 vault（Tauri, n.d.-a）；改為自寫橋接。  
 - 啟用：先以主碼驗證，再把主碼位元組交給 `PwBio.enroll`；原生端建立每設定檔一把 Keystore AES-256-GCM 金鑰（`setUserAuthenticationRequired(true)`、`setInvalidatedByBiometricEnrollment(true)`，Android 11 以上 `setUserAuthenticationParameters(0, AUTH_BIOMETRIC_STRONG)`），經 `BiometricPrompt` 加 `CryptoObject` 通過後加密主碼，密文與 IV 存私有 `SharedPreferences`（`pw_bio`），別名為設定檔名 SHA-256 前 32 個十六進位字元。  
 - 包裝主碼而非衍生金鑰：轉換格式與重新加鹽不會使其失效。主碼變更後前端以新主碼重新註冊（取消則停用）；新增指紋、密文遺失、解密後無法開庫都會清除註冊並提示。建立同名、匯入覆蓋、刪除設定檔也清除。  
 - 回傳協定：`window.__pwBioDone(id, code, data)`；`code` 為 `ok`、`cancel`、`lockout`、`missing`、`invalidated`、`error`。只接受 `BIOMETRIC_STRONG`（許多裝置的臉部辨識只屬 Class 2，不符）；主碼的 base64 字串會短暫存在於 JS 堆積。威脅模型：便利功能，強度低於主碼（Android Developers, n.d.-a）。  
@@ -180,6 +181,29 @@ adb install --no-incremental -r src-tauri/gen/android/app/build/outputs/apk/univ
 - macOS：`npm run tauri build -- --bundles app` 產生 `src-tauri/target/release/bundle/macos/ArgoVault.app`（ad-hoc 簽署，已驗證可建置與啟動；最低系統版本 11.0）；`.dmg`（`--bundles app,dmg`）可建置；視窗寬度低於 820 會顯示手機版面；禁止截圖與返回鍵只在 Android 有效。  
 - 編譯警告（`setValue` 棄用、AGP 的 `android.newDsl` 等）皆可忽略。  
 
+### 7.1 Windows 建置（未驗證）
+
+前置（Tauri, n.d.-b）：Microsoft C++ Build Tools（勾選「使用 C++ 的桌面開發」）、WebView2 Runtime（Windows 10 1803 以上與 Windows 11 已內建）、Rust（`stable-msvc` 工具鏈）、Node.js LTS、Git。於 PowerShell 執行：
+
+```
+git clone git@github.com:HaveLightII/ArgoVault.git
+cd ArgoVault
+npm install
+npm run tauri build
+```
+
+1：取得原始碼；已有倉庫時改為 `git pull`。  
+2：進入專案。  
+3：安裝 Tauri CLI。  
+4：建置；首次會自動下載 WiX 與 NSIS。產物在 `src-tauri\target\release\bundle\msi\`（`.msi`）與 `bundle\nsis\`（`-setup.exe`），免安裝執行檔為 `src-tauri\target\release\pypasswords.exe`。  
+
+- 程式無 Windows 專屬程式碼：`build.rs` 與 `lib.rs` 的生物辨識只在目標為 macOS 時編譯，其他平台不註冊 command（此路徑已由 Android 建置確認可編譯；Windows 目標本身未編譯過）。  
+- 資料位置預期為 `%APPDATA%\com.havelight.pypasswords\`（`vault\`、`settings.json`）。  
+- 無生物辨識（未實作 Windows Hello）、無自動填入，相關按鈕不顯示；禁止截圖與返回鍵只在 Android 有效。  
+- 安裝檔未簽署，SmartScreen 會警告。  
+- `.gitattributes` 固定 `src/index.html` 為 LF，避免 Git for Windows 轉成 CRLF。  
+- 建置後待測：建立與解鎖、匯出入備份（系統檔案對話框）、變更主碼與轉換格式（涉及暫存檔改名覆蓋）、剪貼簿、閒置與背景鎖定。  
+
 ## 8. 驗證狀態
 
 ### 8.1 已驗證
@@ -208,7 +232,7 @@ adb install --no-incremental -r src-tauri/gen/android/app/build/outputs/apk/univ
 - 匯出的 `.bin` 與 `.sha256` 以 `sha256sum` 比對、以原 Python 版解密；JS 寫出的 PWV2 由 Python 解密。  
 - Android SAF 寫入是否截斷既有檔、`defaultPath` 是否生效；系統檔案對話框讓 App 進背景時為何不觸發 `pagehide` 鎖定（實測正常，原因未確認）。  
 - 禁止截圖的最近工作畫面縮圖細節；重開偶發卡頓的真正原因（目前未再重現，復發時收集 `adb logcat -v time | grep -iE "\[PW\]|pypasswords|AndroidRuntime|FATAL|ANR|chromium|tauri"`）。  
-- `allowBackup` 預設值；自有金鑰簽署；macOS 改過程式碼再重建後舊註冊是否仍可用、新增指紋後註冊失效（見 6.6）。  
+- `allowBackup` 預設值；自有金鑰簽署；Windows 建置與執行（見 7.1）；macOS 改過程式碼再重建後舊註冊是否仍可用、新增指紋後註冊失效（見 6.6）。  
 
 ## 9. 已知限制與待辦
 
@@ -268,6 +292,7 @@ tar -czf ~/ArgoVault_min_$(date +%Y%m%d).tar.gz HANDOFF.md README.md src/index.h
 
 - 2026-11-13：自動填入實機驗證通過；建議按鈕改自訂版面；編輯前主碼對話框加生物辨識；編輯頁加密碼複製鈕；編輯中切背景不鎖庫（見 9）；三項皆實機通過，自動填入相關檔案首次提交（`a7bee98`）。
 - 2026-11-14：放棄 macOS 自動填入；新增 macOS 生物辨識解鎖（Touch ID 加 Secure Enclave，見 6.6），實機通過。清單頁按返回鍵改為只鎖定、不退出 App（實機 OK，APK 於 macOS 主機建置）。版本改為 0.1.1（`tauri.conf.json`、`Cargo.toml`、`package.json` 與兩個 lock 檔），發佈 GitHub Release `0.1.1`（附 APK 與 arm64 `.dmg`；`.dmg` 建置已驗證，`.deb` 須在 Ubuntu 建置，未附）。  
+- 2026-11-14：新增 Windows 建置說明（7.1）、`.gitattributes`，`.gitignore` 加 `*.msi`、`*.exe`、`*.deb`。  
 
 ## 參考資料
 
@@ -276,4 +301,5 @@ tar -czf ~/ArgoVault_min_$(date +%Y%m%d).tar.gz HANDOFF.md README.md src/index.h
 - Android Developers. (n.d.-b). *Build autofill services*. Google. https://developer.android.com/identity/autofill/autofill-services  
 - Android Developers Blog. (2024, October 16). *Chrome on Android to support third-party autofill services natively*. Google. https://android-developers.googleblog.com/2024/10/chrome-3p-autofill-services.html  
 - GitHub Docs. (n.d.). *Renaming a repository*. GitHub. https://docs.github.com/en/repositories/creating-and-managing-repositories/renaming-a-repository  
-- Tauri. (n.d.). *Biometric*. https://v2.tauri.app/fr/plugin/biometric/  
+- Tauri. (n.d.-a). *Biometric*. https://v2.tauri.app/fr/plugin/biometric/  
+- Tauri. (n.d.-b). *Prerequisites*. https://v2.tauri.app/start/prerequisites/  
