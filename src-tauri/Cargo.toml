@@ -1,6 +1,6 @@
 [package]
 name = "pypasswords"
-version = "0.1.0"
+version = "0.1.1"
 description = "離線多設定檔密碼管理程式"
 authors = ["HaveLightII"]
 edition = "2024"

@@ -8,7 +8,7 @@
 
 - 倉庫：`git@github.com:HaveLightII/ArgoVault.git`（分支 `main`），本機 `~/gits/ArgoVault`。  
 - `identifier` 為 `com.havelight.pypasswords`，不可更動（改了等於另一個 App，資料不通）。crate 與 lib 名稱仍是 `pypasswords`、`libpypasswords_lib.so`（建置輸出已確認），刻意不改。  
-- 手機：三星，arm64；安裝的是以 debug 金鑰簽署的 release APK。  
+- 手機：三星（2026-11-14 實測裝置為 SM-T500），arm64；安裝的是以 debug 金鑰簽署的 release APK。  
 
 | 項目 | 狀態 |
 | --- | --- |
@@ -33,7 +33,7 @@
 - 使用者常貼終端機輸出，回答前逐行核對並指出實際問題；不要建議把輸出重導向到 `$(tty)`（曾因此誤建 `a`、`not`、`tty` 三個檔案），`git` 長輸出用 `--no-pager`。  
 - 簽署 APK 用 `java -jar ~/bin/uber-apk-signer-1.3.0.jar -a <未簽署 APK>`（內嵌 debug 金鑰）。  
 - 每完成一個步驟就更新本文件，並盡量精簡（不影響交接的前提下）；同時列出交接附檔與快照指令（第 12 節）。  
-- 建置主機有兩台：Ubuntu 26.04（bash，Android 建置）與 macOS 27（zsh，只有 Command Line Tools，無 Xcode、無簽署憑證；macOS 版建置），指令以當前主機為準。專案實際路徑 `~/gits/ArgoVault`（使用者曾把舊名打成 `~/PyPassword`）。GitHub 帳號 `HaveLightII`。  
+- 建置主機有兩台：Ubuntu 26.04（bash，Android 建置）與 macOS 27（zsh，只有 Command Line Tools，無 Xcode、無簽署憑證；macOS 版建置，也可建置 Android：`ANDROID_HOME=~/Android/Sdk`、NDK `28.2.13676358`、JDK 17，簽署工具檔名為 `~/bin/uber-apk-signer.jar`，同為 1.3.0 版與同一把內嵌 debug 金鑰，可覆蓋安裝），指令以當前主機為準。專案實際路徑 `~/gits/ArgoVault`（使用者曾把舊名打成 `~/PyPassword`）。GitHub 帳號 `HaveLightII`。  
 
 ## 3. 資料格式
 
@@ -127,7 +127,7 @@ JS 把 `1` 或 `0` 寫入 `<AppData>/secure.flag`；`MainActivity` 在 `onCreate
 
 JS `window.__pwBack()` 回傳 `true` 表示已處理；`MainActivity` 以 `OnBackPressedCallback` 攔截並 `evaluateJavascript`，結果不是 `"true"` 就 `finish()`。WebView 由走訪 `android.R.id.content` 取得。  
 
-- 順序：先關最上層對話框（檢查順序 `#dlgAsk`、`#dlgAuth`、`#dlgConv`、`#dlgPw`、`#dlgImp`、`#dlg`、`#dlgSet`，以其取消鈕 `click()`）；運算中不處理；編輯表單取消；多選結束；詳情回清單；搜尋有字則清空；清單最上層 `lock()` 後退出；建立分頁（已有設定檔）回解鎖分頁；解鎖頁退出。  
+- 順序：先關最上層對話框（檢查順序 `#dlgAsk`、`#dlgAuth`、`#dlgConv`、`#dlgPw`、`#dlgImp`、`#dlg`、`#dlgSet`，以其取消鈕 `click()`）；運算中不處理；編輯表單取消；多選結束；詳情回清單；搜尋有字則清空；清單最上層 `lock()` 並留在解鎖頁（2026-11-14 起不再退出，實機 OK）；建立分頁（已有設定檔）回解鎖分頁；解鎖頁退出。  
 
 ### 6.4 生物辨識解鎖（已實機驗證）
 
@@ -177,7 +177,7 @@ adb install --no-incremental -r src-tauri/gen/android/app/build/outputs/apk/univ
 - 簽章與先前不同時會出現 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`，須先匯出備份再 `adb uninstall com.havelight.pypasswords`（等於清空資料）。release 版不能用 `run-as`。  
 - 圖示：`app-icon.png`（1024×1024、透明背景、主體在中央約 66%）執行 `npm run tauri icon app-icon.png -- --ios-color "#234e70"`；圖示不更新是啟動器快取。  
 - 自有金鑰簽署尚未執行：流程為 `keytool` 產生 `.jks`、`zipalign`、`apksigner sign`；金鑰遺失即無法原地更新，執行前先匯出 vault 並備份金鑰與密碼。  
-- macOS：`npm run tauri build -- --bundles app` 產生 `src-tauri/target/release/bundle/macos/ArgoVault.app`（ad-hoc 簽署，已驗證可建置與啟動；最低系統版本 11.0）；`.dmg`（`--bundles dmg`）未驗證；視窗寬度低於 820 會顯示手機版面；禁止截圖與返回鍵只在 Android 有效。  
+- macOS：`npm run tauri build -- --bundles app` 產生 `src-tauri/target/release/bundle/macos/ArgoVault.app`（ad-hoc 簽署，已驗證可建置與啟動；最低系統版本 11.0）；`.dmg`（`--bundles app,dmg`）可建置；視窗寬度低於 820 會顯示手機版面；禁止截圖與返回鍵只在 Android 有效。  
 - 編譯警告（`setValue` 棄用、AGP 的 `android.newDsl` 等）皆可忽略。  
 
 ## 8. 驗證狀態
@@ -208,7 +208,7 @@ adb install --no-incremental -r src-tauri/gen/android/app/build/outputs/apk/univ
 - 匯出的 `.bin` 與 `.sha256` 以 `sha256sum` 比對、以原 Python 版解密；JS 寫出的 PWV2 由 Python 解密。  
 - Android SAF 寫入是否截斷既有檔、`defaultPath` 是否生效；系統檔案對話框讓 App 進背景時為何不觸發 `pagehide` 鎖定（實測正常，原因未確認）。  
 - 禁止截圖的最近工作畫面縮圖細節；重開偶發卡頓的真正原因（目前未再重現，復發時收集 `adb logcat -v time | grep -iE "\[PW\]|pypasswords|AndroidRuntime|FATAL|ANR|chromium|tauri"`）。  
-- `allowBackup` 預設值；自有金鑰簽署；macOS `.dmg`；macOS 改過程式碼再重建後舊註冊是否仍可用、新增指紋後註冊失效（見 6.6）。  
+- `allowBackup` 預設值；自有金鑰簽署；macOS 改過程式碼再重建後舊註冊是否仍可用、新增指紋後註冊失效（見 6.6）。  
 
 ## 9. 已知限制與待辦
 
@@ -267,7 +267,7 @@ tar -czf ~/ArgoVault_min_$(date +%Y%m%d).tar.gz HANDOFF.md README.md src/index.h
 - 2026-11-12：桌面名稱（`strings.xml`、`tauri.conf.json`）改為 ArgoVault 並推送；README 與交接文件進倉庫；新增自動填入（方案 A）並成功建置安裝，待實機測試；本文件精簡重寫（移除內嵌程式碼與歷史敘事，改附快照）。  
 
 - 2026-11-13：自動填入實機驗證通過；建議按鈕改自訂版面；編輯前主碼對話框加生物辨識；編輯頁加密碼複製鈕；編輯中切背景不鎖庫（見 9）；三項皆實機通過，自動填入相關檔案首次提交（`a7bee98`）。
-- 2026-11-14：放棄 macOS 自動填入；新增 macOS 生物辨識解鎖（Touch ID 加 Secure Enclave，見 6.6），實機通過。  
+- 2026-11-14：放棄 macOS 自動填入；新增 macOS 生物辨識解鎖（Touch ID 加 Secure Enclave，見 6.6），實機通過。清單頁按返回鍵改為只鎖定、不退出 App（實機 OK，APK 於 macOS 主機建置）。版本改為 0.1.1（`tauri.conf.json`、`Cargo.toml`、`package.json` 與兩個 lock 檔），發佈 GitHub Release `0.1.1`（附 APK 與 arm64 `.dmg`；`.dmg` 建置已驗證，`.deb` 須在 Ubuntu 建置，未附）。  
 
 ## 參考資料
 

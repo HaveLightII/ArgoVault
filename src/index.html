@@ -1290,7 +1290,7 @@ window.__pwBack=()=>{
   if(S.multi){S.multi=null;render();return true}
   if(S.sel){stopRev();S.sel=null;render();return true}
   if($("#q").value){$("#q").value="";renderList();return true}
-  lock();return false;
+  lock();return true;
  }
  if(!$("#pC").hidden&&profiles().length){tab("U");return true}
  return false;
