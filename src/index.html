@@ -445,6 +445,8 @@ const EN={
 "啟用後，請在 Chrome 設定的「自動填入服務」選「使用其他服務自動填入」。紀錄需填寫「網站網址」才會自動比對；每次填入都要先解鎖。":"After enabling, choose \"Autofill using another service\" under Autofill services in Chrome settings. A record needs a Website URL to be matched automatically; every fill requires unlocking first.",
 "自動填入模式為唯讀":"Autofill mode is read-only",
 "生物辨識解鎖":"Biometric unlock",
+"啟用「{n}」的 Touch ID 解鎖":"enable Touch ID unlock for \"{n}\"",
+"解鎖設定檔「{n}」":"unlock profile \"{n}\"",
 "改用主碼":"Use master password",
 "生物辨識驗證":"Biometric verification",
 "生物辨識解鎖已停用（主碼可能已變更），請以主碼驗證後重新啟用":"Biometric unlock was disabled (the master password may have changed). Verify with the master password and enable it again",
@@ -837,7 +839,20 @@ $("#uPw").addEventListener("keydown",e=>{if(isEnter(e)){e.preventDefault();$("#b
 $("#cPw2").addEventListener("keydown",e=>{if(isEnter(e)){e.preventDefault();$("#bCreate").click()}});
 $("#pwNew2").addEventListener("keydown",e=>{if(isEnter(e)){e.preventDefault();$("#pwOk").click()}});
 $("#iName").addEventListener("keydown",e=>{if(isEnter(e)){e.preventDefault();if(!$("#iOk").disabled)$("#iOk").click()}});
-/* ---------- 生物辨識（Android 橋接 PwBio；其他平台沒有此物件，相關按鈕不會出現） ---------- */
+/* ---------- 生物辨識（Android 橋接 PwBio；macOS 為下方 shim；其他平台沒有此物件，相關按鈕不會出現） ---------- */
+/* macOS（Tauri）：以 Rust command 提供同協定的 PwBio；status、has 為同步呼叫，故啟動時由 bioInit 載入快取 */
+const macBio={status:"none",has:new Set()};
+const bioInit=async()=>{if(!window.PwBio||!window.PwBio.mac)return;try{const r=await tauriApi.core.invoke("bio_init");macBio.status=String(r.status);macBio.has=new Set(r.profiles)}catch{}};
+if(tauriApi&&!window.PwBio&&/Macintosh/.test(navigator.userAgent)){
+ const done=(id,r,data)=>window.__pwBioDone(id,r.code,r.code==="ok"?data:r.msg||"");
+ window.PwBio={mac:true,
+  status:()=>macBio.status,
+  has:n=>macBio.has.has(n),
+  remove:n=>{macBio.has.delete(n);tauriApi.core.invoke("bio_remove",{profile:n}).catch(()=>{})},
+  enroll:(n,secretB64,title,cancel,id)=>{const u=unb64(secretB64);tauriApi.core.invoke("bio_enroll",{profile:n,secret:[...u],reason:t("啟用「{n}」的 Touch ID 解鎖",{n}),cancel}).then(r=>{if(r.code==="ok")macBio.has.add(n);done(id,r,"")},e=>window.__pwBioDone(id,"error",String(e))).finally(()=>u.fill(0))},
+  unlock:(n,title,cancel,id)=>{tauriApi.core.invoke("bio_unlock",{profile:n,reason:t("解鎖設定檔「{n}」",{n}),cancel}).then(r=>{const u=Uint8Array.from(r.data||[]);done(id,r,b64(u));u.fill(0)},e=>window.__pwBioDone(id,"error",String(e)))}
+ };
+}
 const bioApi=window.PwBio||null,bioCbs={},BIO_MSG="此裝置無法使用強生物辨識（需要已登錄的指紋或同等級的生物辨識）";let bioSeq=0;
 window.__pwBioDone=(id,code,data)=>{const f=bioCbs[id];delete bioCbs[id];if(f)f({code,data})};
 const bioCall=(fn,...a)=>new Promise(res=>{const id=String(++bioSeq);bioCbs[id]=res;try{bioApi[fn](...a,id)}catch(e){delete bioCbs[id];res({code:"error",data:String(e&&e.message||e)})}});
@@ -1287,7 +1302,7 @@ addEventListener("unhandledrejection",e=>toast(t("錯誤：{m}",{m:(e.reason&&e.
 trDom();
 if(afApi)document.body.classList.add("af");
 if(tauriApi||afApi){$("#uSel").innerHTML="<option>"+t("載入設定檔中…")+"</option>";$("#bUnlock").disabled=true}
-Promise.all([cfgLoad(),storeInit().catch(e=>toast(t("讀取資料庫失敗：{m}",{m:e.message||e}),1))]).then(async()=>{
+Promise.all([cfgLoad(),bioInit(),storeInit().catch(e=>toast(t("讀取資料庫失敗：{m}",{m:e.message||e}),1))]).then(async()=>{
  $("#cFmt").value=cfg.fmt;
  applyLang();
  try{await cfgFlag()}catch{}

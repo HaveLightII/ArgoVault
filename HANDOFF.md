@@ -1,6 +1,6 @@
 # ArgoVault 交接文件
 
-最後更新：2026-11-13。原名 PyPasswords（2026-11-11 改名）。本文件不內嵌程式碼，程式以快照檔（第 12 節）一併提供。  
+最後更新：2026-11-14。原名 PyPasswords（2026-11-11 改名）。本文件不內嵌程式碼，程式以快照檔（第 12 節）一併提供。  
 
 ## 1. 專案與目前狀態
 
@@ -18,6 +18,8 @@
 | 改名 ArgoVault | 倉庫與 `strings.xml`、`tauri.conf.json` 已改並建置安裝；使用者未回報桌面名稱 |
 | 瀏覽器自動填入 | 實機 OK：已啟用、建議（自訂版面）清楚可見、解鎖正常、僅列符合紀錄、一次點擊即填入 |
 | 編輯前主碼對話框生物辨識、編輯頁複製鈕、編輯中離開不鎖庫 | 實機 OK（2026-11-13） |
+| macOS 生物辨識解鎖（Touch ID，見 6.6） | 實機 OK（2026-11-14） |
+| macOS 自動填入 | 2026-11-14 決定放棄（無 Xcode 與簽署憑證） |
 
 ## 2. 使用者偏好（需遵守）
 
@@ -31,7 +33,7 @@
 - 使用者常貼終端機輸出，回答前逐行核對並指出實際問題；不要建議把輸出重導向到 `$(tty)`（曾因此誤建 `a`、`not`、`tty` 三個檔案），`git` 長輸出用 `--no-pager`。  
 - 簽署 APK 用 `java -jar ~/bin/uber-apk-signer-1.3.0.jar -a <未簽署 APK>`（內嵌 debug 金鑰）。  
 - 每完成一個步驟就更新本文件，並盡量精簡（不影響交接的前提下）；同時列出交接附檔與快照指令（第 12 節）。  
-- 建置主機現為 Ubuntu 26.04（bash）；舊紀錄曾用 macOS（zsh、`sed -i ''`），指令以當前主機為準。專案實際路徑 `~/gits/ArgoVault`（使用者曾把舊名打成 `~/PyPassword`）。GitHub 帳號 `HaveLightII`。  
+- 建置主機有兩台：Ubuntu 26.04（bash，Android 建置）與 macOS 27（zsh，只有 Command Line Tools，無 Xcode、無簽署憑證；macOS 版建置），指令以當前主機為準。專案實際路徑 `~/gits/ArgoVault`（使用者曾把舊名打成 `~/PyPassword`）。GitHub 帳號 `HaveLightII`。  
 
 ## 3. 資料格式
 
@@ -98,7 +100,7 @@
 - `authOpen(reason, soft)`：`soft` 為真（只有查看密碼）、`reauth` 為假且 `S.ses` 與檔頭 `fmt`、`salt` 相符時，直接 `unseal`，否則退回詢問主碼；成功後若 `reauth` 為假就快取金鑰。  
 - `ask(reason, bio)`：`bio` 為真且該設定檔已註冊生物辨識時，`#dlgAuth` 顯示「生物辨識驗證」鈕，成功即以主碼位元組走原流程；只有 `authOpen` 傳 `true`（查看、新增、編輯、刪除、匯入 CSV 皆可用，啟用生物辨識與變更主碼不用）。失敗訊息顯示在對話框內 `#aErr`（對話框在 top layer，`toast` 會被蓋住）；驗證後主碼無法開庫則停用註冊。
 - 解鎖流程為 `doUnlock(name, pw, fromBio)`（主碼與生物辨識共用）；生物辨識解鎖後無法開庫（主碼已變）會自動停用該設定檔的註冊。  
-- 橋接物件（皆只在 Android 存在，否則相關按鈕隱藏）：`window.PwBio`（生物辨識與自動填入設定）、`window.PwAF`（自動填入模式，`body.af`，只讀，解鎖後 `afList` 顯示比對清單，不建立 `S`）。  
+- 橋接物件（不存在時相關按鈕隱藏）：`window.PwBio`（生物辨識與自動填入設定；Android 為原生橋接，macOS Tauri 為前端 shim，見 6.6）、`window.PwAF`（僅 Android）（自動填入模式，`body.af`，只讀，解鎖後 `afList` 顯示比對清單，不建立 `S`）。  
 - 過去的陷阱：`lock()` 內不可引用不存在的元素 ID；鍵盤 `onkeydown` 對非 Enter 鍵不可 `return false`（會擋住倒退刪字）；`unseal` 最小長度 28。  
 
 ## 6. Android 整合
@@ -147,6 +149,15 @@ JS `window.__pwBack()` 回傳 `true` 表示已處理；`MainActivity` 以 `OnBac
 - 已知限制：不支援先填帳號、下一頁才填密碼的多步驟登入；只針對 Chrome；網域取決於瀏覽器是否提供；`afUser` 是暫時做法（紀錄沒有專屬登入帳號欄位），不合用時可改為新增獨立欄位。  
 - 已驗證（2026-11-13）：資料集層級驗證一次點擊即填入；`profiles()` 找得到檔案；`assets/` 額外檔案未被清除。未驗證：Argon2id 的 Blob Worker 可在該 WebView 運作。  
 
+### 6.6 macOS 生物辨識解鎖（Touch ID，實機 OK）
+
+- 設計等同 6.4：包裝主碼而非衍生金鑰。`src-tauri/macos/bio.swift` 以 CryptoKit 建立每設定檔一把 Secure Enclave P-256 金鑰（存取控制 `privateKeyUsage` 加 `biometryCurrentSet`），與一次性軟體金鑰做 ECDH，經 HKDF-SHA256 得 AES-256-GCM 金鑰加密主碼（Apple, n.d.）。金鑰資料、一次性公鑰、密文與註冊當下的生物辨識狀態雜湊存 `<AppData>/bio/<設定檔>.bio`（JSON，權限 600）；金鑰資料只有本機 Secure Enclave 能用。  
+- 流程：先 `LAContext.evaluatePolicy`（僅生物辨識，不提供密碼後備），同一個 context 交給金鑰使用，預期只跳一次 Touch ID。啟用時會立即解密比對一次。狀態雜湊與註冊時不同即回 `invalidated`。  
+- 串接：`build.rs` 在目標為 macOS 時以 `swiftc` 編成靜態庫 `libargobio.a` 並連結（不需 Xcode 與 `swift-rs`）；`lib.rs` 的 `bio` 模組提供 command `bio_init`、`bio_remove`、`bio_enroll`、`bio_unlock`（皆 `#[tauri::command(async)]`，不可在主執行緒呼叫，否則 Touch ID 對話框會卡死）。  
+- 前端：`window.PwBio` 不存在、為 Tauri 且 User-Agent 含 `Macintosh` 時注入同協定 shim（`mac:true`）；`status()`、`has()` 是同步呼叫，由啟動時的 `bioInit()` 載入快取 `macBio`。Touch ID 對話框文字為「ArgoVault 正在嘗試」加上 shim 傳入的理由字串（已加進 `EN`）。  
+- 已實測（2026-11-14）：ad-hoc 簽署的程式可建立並還原 Secure Enclave 金鑰；release `.app` 建置成功並可啟動；使用者回報實測通過（檢查項目：啟用時 Touch ID 只跳一次、Touch ID 解鎖、取消後仍可用主碼）。未實測：重建 App 後舊註冊是否仍可用、新增指紋後失效。  
+- 已知限制：無 Touch ID 的 Mac 狀態為 `nohw`，按鈕仍顯示但會提示無法使用；`.bio` 檔不隨備份匯出，換機須重新啟用。  
+
 ## 7. 建置與安裝（Ubuntu）
 
 環境：`ANDROID_HOME=$HOME/Android/Sdk`，NDK `27.2.12479018`，JDK 17，Rust 目標 `aarch64-linux-android`，簽署工具 `~/bin/uber-apk-signer-1.3.0.jar`（內含 zipalign 與 debug 金鑰）。Tauri 外掛：`fs`、`dialog`、`clipboard-manager`，權限在 `capabilities/default.json`，`app.withGlobalTauri` 為 `true`。  
@@ -166,7 +177,7 @@ adb install --no-incremental -r src-tauri/gen/android/app/build/outputs/apk/univ
 - 簽章與先前不同時會出現 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`，須先匯出備份再 `adb uninstall com.havelight.pypasswords`（等於清空資料）。release 版不能用 `run-as`。  
 - 圖示：`app-icon.png`（1024×1024、透明背景、主體在中央約 66%）執行 `npm run tauri icon app-icon.png -- --ios-color "#234e70"`；圖示不更新是啟動器快取。  
 - 自有金鑰簽署尚未執行：流程為 `keytool` 產生 `.jks`、`zipalign`、`apksigner sign`；金鑰遺失即無法原地更新，執行前先匯出 vault 並備份金鑰與密碼。  
-- macOS `.dmg`（`npm run tauri build -- --bundles dmg`，須在 macOS 圖形介面）未驗證；視窗寬度低於 820 會顯示手機版面；禁止截圖與返回鍵只在 Android 有效。  
+- macOS：`npm run tauri build -- --bundles app` 產生 `src-tauri/target/release/bundle/macos/ArgoVault.app`（ad-hoc 簽署，已驗證可建置與啟動；最低系統版本 11.0）；`.dmg`（`--bundles dmg`）未驗證；視窗寬度低於 820 會顯示手機版面；禁止截圖與返回鍵只在 Android 有效。  
 - 編譯警告（`setValue` 棄用、AGP 的 `android.newDsl` 等）皆可忽略。  
 
 ## 8. 驗證狀態
@@ -197,7 +208,7 @@ adb install --no-incremental -r src-tauri/gen/android/app/build/outputs/apk/univ
 - 匯出的 `.bin` 與 `.sha256` 以 `sha256sum` 比對、以原 Python 版解密；JS 寫出的 PWV2 由 Python 解密。  
 - Android SAF 寫入是否截斷既有檔、`defaultPath` 是否生效；系統檔案對話框讓 App 進背景時為何不觸發 `pagehide` 鎖定（實測正常，原因未確認）。  
 - 禁止截圖的最近工作畫面縮圖細節；重開偶發卡頓的真正原因（目前未再重現，復發時收集 `adb logcat -v time | grep -iE "\[PW\]|pypasswords|AndroidRuntime|FATAL|ANR|chromium|tauri"`）。  
-- `allowBackup` 預設值；自有金鑰簽署；macOS `.dmg`。  
+- `allowBackup` 預設值；自有金鑰簽署；macOS `.dmg`；macOS 重建 App 後舊註冊是否仍可用、新增指紋後註冊失效（見 6.6）。  
 
 ## 9. 已知限制與待辦
 
@@ -227,7 +238,7 @@ adb install --no-incremental -r src-tauri/gen/android/app/build/outputs/apk/univ
 
 ## 12. 交接時附上的檔案與快照指令
 
-必附：`ArgoVault_HANDOFF.md`、`src/index.html`（單一前端來源）。做 Android 或 Tauri 相關工作時加附 6.1 表內的檔案，以及 `tauri.conf.json`、`capabilities/default.json`、`Cargo.toml`、`lib.rs`、`main.rs`、`package.json`；改文件時加附 `README.md`。不要附 `target/`、`node_modules/`、建置輸出、圖示、lock 檔、`.git`。  
+必附：`HANDOFF.md`、`src/index.html`（單一前端來源）。做 Android 或 Tauri 相關工作時加附 6.1 表內的檔案，以及 `tauri.conf.json`、`capabilities/default.json`、`Cargo.toml`、`build.rs`、`lib.rs`、`main.rs`、`macos/bio.swift`、`package.json`；改文件時加附 `README.md`。不要附 `target/`、`node_modules/`、建置輸出、圖示、lock 檔、`.git`。  
 
 完整快照（工作目錄的現況，含未提交修改）：
 
@@ -235,7 +246,7 @@ adb install --no-incremental -r src-tauri/gen/android/app/build/outputs/apk/univ
 cd ~/gits/ArgoVault
 a=src-tauri/gen/android/app
 k=$a/src/main/java/com/havelight/pypasswords
-tar -czf ~/ArgoVault_snapshot_$(date +%Y%m%d).tar.gz ArgoVault_HANDOFF.md README.md package.json src/index.html src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/build.rs src-tauri/capabilities/default.json src-tauri/src/lib.rs src-tauri/src/main.rs $a/build.gradle.kts $a/proguard-rules.pro $a/src/main/AndroidManifest.xml $a/src/main/res/xml/autofill_service.xml $a/src/main/res/values/strings.xml $k/MainActivity.kt $k/PwBio.kt $k/ArgoAutofillService.kt $k/AutofillAuthActivity.kt $a/src/main/res/layout/autofill_item.xml
+tar -czf ~/ArgoVault_snapshot_$(date +%Y%m%d).tar.gz HANDOFF.md README.md package.json src/index.html src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/build.rs src-tauri/capabilities/default.json src-tauri/src/lib.rs src-tauri/src/main.rs src-tauri/macos/bio.swift $a/build.gradle.kts $a/proguard-rules.pro $a/src/main/AndroidManifest.xml $a/src/main/res/xml/autofill_service.xml $a/src/main/res/values/strings.xml $k/MainActivity.kt $k/PwBio.kt $k/ArgoAutofillService.kt $k/AutofillAuthActivity.kt $a/src/main/res/layout/autofill_item.xml
 tar -tzf ~/ArgoVault_snapshot_$(date +%Y%m%d).tar.gz
 ```
 
@@ -247,7 +258,7 @@ tar -tzf ~/ArgoVault_snapshot_$(date +%Y%m%d).tar.gz
 
 ```
 cd ~/gits/ArgoVault
-tar -czf ~/ArgoVault_min_$(date +%Y%m%d).tar.gz ArgoVault_HANDOFF.md README.md src/index.html
+tar -czf ~/ArgoVault_min_$(date +%Y%m%d).tar.gz HANDOFF.md README.md src/index.html
 ```
 
 ## 13. 變更紀錄
@@ -256,9 +267,11 @@ tar -czf ~/ArgoVault_min_$(date +%Y%m%d).tar.gz ArgoVault_HANDOFF.md README.md s
 - 2026-11-12：桌面名稱（`strings.xml`、`tauri.conf.json`）改為 ArgoVault 並推送；README 與交接文件進倉庫；新增自動填入（方案 A）並成功建置安裝，待實機測試；本文件精簡重寫（移除內嵌程式碼與歷史敘事，改附快照）。  
 
 - 2026-11-13：自動填入實機驗證通過；建議按鈕改自訂版面；編輯前主碼對話框加生物辨識；編輯頁加密碼複製鈕；編輯中切背景不鎖庫（見 9）；三項皆實機通過，自動填入相關檔案首次提交（`a7bee98`）。
+- 2026-11-14：放棄 macOS 自動填入；新增 macOS 生物辨識解鎖（Touch ID 加 Secure Enclave，見 6.6），實機通過。  
 
 ## 參考資料
 
+- Apple. (n.d.). *SecureEnclave*. Apple Developer Documentation. https://developer.apple.com/documentation/cryptokit/secureenclave  
 - Android Developers. (n.d.-a). *Show a biometric authentication dialog*. Google. https://developer.android.com/identity/sign-in/biometric-auth  
 - Android Developers. (n.d.-b). *Build autofill services*. Google. https://developer.android.com/identity/autofill/autofill-services  
 - Android Developers Blog. (2024, October 16). *Chrome on Android to support third-party autofill services natively*. Google. https://android-developers.googleblog.com/2024/10/chrome-3p-autofill-services.html  
