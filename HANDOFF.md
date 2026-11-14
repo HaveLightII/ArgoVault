@@ -155,7 +155,7 @@ JS `window.__pwBack()` 回傳 `true` 表示已處理；`MainActivity` 以 `OnBac
 - 流程：先 `LAContext.evaluatePolicy`（僅生物辨識，不提供密碼後備），同一個 context 交給金鑰使用，預期只跳一次 Touch ID。啟用時會立即解密比對一次。狀態雜湊與註冊時不同即回 `invalidated`。  
 - 串接：`build.rs` 在目標為 macOS 時以 `swiftc` 編成靜態庫 `libargobio.a` 並連結（不需 Xcode 與 `swift-rs`）；`lib.rs` 的 `bio` 模組提供 command `bio_init`、`bio_remove`、`bio_enroll`、`bio_unlock`（皆 `#[tauri::command(async)]`，不可在主執行緒呼叫，否則 Touch ID 對話框會卡死）。  
 - 前端：`window.PwBio` 不存在、為 Tauri 且 User-Agent 含 `Macintosh` 時注入同協定 shim（`mac:true`）；`status()`、`has()` 是同步呼叫，由啟動時的 `bioInit()` 載入快取 `macBio`。Touch ID 對話框文字為「ArgoVault 正在嘗試」加上 shim 傳入的理由字串（已加進 `EN`）。  
-- 已實測（2026-11-14）：ad-hoc 簽署的程式可建立並還原 Secure Enclave 金鑰；release `.app` 建置成功並可啟動；使用者回報實測通過（檢查項目：啟用時 Touch ID 只跳一次、Touch ID 解鎖、取消後仍可用主碼）。未實測：重建 App 後舊註冊是否仍可用、新增指紋後失效。  
+- 已實測（2026-11-14）：ad-hoc 簽署的程式可建立並還原 Secure Enclave 金鑰；release `.app` 建置成功並可啟動；使用者回報實測通過（檢查項目：啟用時 Touch ID 只跳一次、Touch ID 解鎖、取消後仍可用主碼；原始碼未變動下重建 App 後舊註冊仍可解鎖）。未實測：改過程式碼再重建後舊註冊是否仍可用、新增指紋後失效。  
 - 已知限制：無 Touch ID 的 Mac 狀態為 `nohw`，按鈕仍顯示但會提示無法使用；`.bio` 檔不隨備份匯出，換機須重新啟用。  
 
 ## 7. 建置與安裝（Ubuntu）
@@ -208,7 +208,7 @@ adb install --no-incremental -r src-tauri/gen/android/app/build/outputs/apk/univ
 - 匯出的 `.bin` 與 `.sha256` 以 `sha256sum` 比對、以原 Python 版解密；JS 寫出的 PWV2 由 Python 解密。  
 - Android SAF 寫入是否截斷既有檔、`defaultPath` 是否生效；系統檔案對話框讓 App 進背景時為何不觸發 `pagehide` 鎖定（實測正常，原因未確認）。  
 - 禁止截圖的最近工作畫面縮圖細節；重開偶發卡頓的真正原因（目前未再重現，復發時收集 `adb logcat -v time | grep -iE "\[PW\]|pypasswords|AndroidRuntime|FATAL|ANR|chromium|tauri"`）。  
-- `allowBackup` 預設值；自有金鑰簽署；macOS `.dmg`；macOS 重建 App 後舊註冊是否仍可用、新增指紋後註冊失效（見 6.6）。  
+- `allowBackup` 預設值；自有金鑰簽署；macOS `.dmg`；macOS 改過程式碼再重建後舊註冊是否仍可用、新增指紋後註冊失效（見 6.6）。  
 
 ## 9. 已知限制與待辦
 
