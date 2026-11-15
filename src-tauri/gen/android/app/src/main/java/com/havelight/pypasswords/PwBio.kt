@@ -183,6 +183,25 @@ class PwBio(private val activity: FragmentActivity, private val webView: WebView
     }
   }
 
+  // 區域網路權限（裝置對裝置同步用）：Android 17（API 37）起強制，較舊版本視為已允許。
+  @JavascriptInterface
+  fun lanOk(): Boolean {
+    if (Build.VERSION.SDK_INT < 37) return true
+    return ContextCompat.checkSelfPermission(activity, "android.permission.ACCESS_LOCAL_NETWORK") ==
+      android.content.pm.PackageManager.PERMISSION_GRANTED
+  }
+
+  @JavascriptInterface
+  fun lanAsk() {
+    if (Build.VERSION.SDK_INT < 37) return
+    activity.runOnUiThread {
+      try {
+        activity.requestPermissions(arrayOf("android.permission.ACCESS_LOCAL_NETWORK"), 4711)
+      } catch (e: Exception) {
+      }
+    }
+  }
+
   @JavascriptInterface
   fun afEnabled(): Boolean {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false

@@ -129,7 +129,7 @@ body.af #bGen,body.af #bSet,body.af #bLock,body.af .tabs,body.af #bImpG,body.af 
    <label for="uPw">主碼</label><input id="uPw" type="password" autocomplete="off" enterkeyhint="go">
    <button class="btn pri full" id="bUnlock">解鎖</button>
    <button class="btn gh full" id="bBio" type="button" hidden>生物辨識解鎖</button>
-   <div class="alt"><button class="btn gh mini" id="bImpG">從備份匯入</button><button class="btn dg mini" id="bDelG">刪除此設定檔</button></div>
+   <div class="alt"><button class="btn gh mini" id="bImpG">從備份匯入</button><button class="btn gh mini" id="bSyncG" hidden>從其他裝置同步</button><button class="btn dg mini" id="bDelG">刪除此設定檔</button></div>
   </div>
   <div id="pC" hidden>
    <label for="cName">設定檔名稱</label><input id="cName" enterkeyhint="next" placeholder="字母、數字、底線、連字號、中文" autocomplete="off">
@@ -160,7 +160,7 @@ body.af #bGen,body.af #bSet,body.af #bLock,body.af .tabs,body.af #bImpG,body.af 
   <ul id="ul" data-nt></ul>
   <div class="foot"><span id="cnt" data-nt></span>
    <details class="more"><summary>更多</summary><div>
-    <button id="bExp">匯出備份</button><button id="bImp">匯入備份</button><button id="bCsv">匯入 CSV</button><button id="bConv">轉換加密格式</button><button id="bPw">變更主碼</button><button id="bBioOn" data-nt hidden></button><button id="bMulti">多選刪除</button><button id="bDel" style="color:var(--dg)">刪除資料庫</button>
+    <button id="bExp">匯出備份</button><button id="bImp">匯入備份</button><button id="bShare" hidden>分享至其他裝置</button><button id="bSync" hidden>從其他裝置同步</button><button id="bCsv">匯入 CSV</button><button id="bConv">轉換加密格式</button><button id="bPw">變更主碼</button><button id="bBioOn" data-nt hidden></button><button id="bMulti">多選刪除</button><button id="bDel" style="color:var(--dg)">刪除資料庫</button>
    </div></details></div>
  </aside>
  <article class="detail" id="dt" data-nt></article>
@@ -180,6 +180,11 @@ body.af #bGen,body.af #bSet,body.af #bLock,body.af .tabs,body.af #bImpG,body.af 
  <p class="note" id="iErr" data-nt hidden style="border-color:var(--dg);color:var(--dg)"></p>
  <p class="note">請將上方 SHA-256 與原備份旁 .sha256 檔案的內容比對，不一致請勿匯入。</p>
  <div class="fa"><button class="btn pri" id="iOk">匯入</button><button class="btn" id="iNo">取消</button></div>
+</dialog>
+<dialog id="dlgSync">
+ <h3 id="syT" data-nt></h3><div id="syBody" data-nt></div>
+ <p class="note" id="syErr" data-nt hidden style="border-color:var(--dg);color:var(--dg)"></p>
+ <div class="fa"><button class="btn pri" id="syOk" type="button" data-nt></button><button class="btn" id="syNo" type="button">取消</button></div>
 </dialog>
 <dialog id="dlgAuth">
  <h3>再次輸入主碼</h3><p class="note" id="aWhy" data-nt></p>
@@ -445,6 +450,26 @@ const EN={
 "啟用後，請在 Chrome 設定的「自動填入服務」選「使用其他服務自動填入」。紀錄需填寫「網站網址」才會自動比對；每次填入都要先解鎖。":"After enabling, choose \"Autofill using another service\" under Autofill services in Chrome settings. A record needs a Website URL to be matched automatically; every fill requires unlocking first.",
 "自動填入模式為唯讀":"Autofill mode is read-only",
 "生物辨識解鎖":"Biometric unlock",
+"分享至其他裝置":"Share to another device",
+"請允許 ArgoVault 存取附近裝置（區域網路），允許後再按一次":"Allow ArgoVault to access nearby devices (local network), then tap again",
+"從其他裝置同步":"Sync from another device",
+"位址":"Address",
+"配對碼":"Pairing code",
+"同步":"Sync",
+"（請至系統設定查看本機 IP）":"(check this device's IP in system settings)",
+"在另一台裝置選「從其他裝置同步」，輸入下列位址與配對碼。兩台裝置須在同一網路；完成、取消或 5 分鐘後自動停止分享。":"On the other device choose \"Sync from another device\" and enter the address and pairing code below. Both devices must be on the same network. Sharing stops when done, cancelled, or after 5 minutes.",
+"先在來源裝置解鎖，選「更多」裡的「分享至其他裝置」，再輸入它顯示的位址與配對碼。取得後會進入匯入備份畫面，由你決定設定檔名稱。":"Unlock the source device first, choose \"Share to another device\" under More, then enter the address and pairing code it shows. The import screen follows, where you choose the profile name.",
+"請輸入位址與 6 位數配對碼":"Enter the address and the 6-digit pairing code",
+"對方已取得資料庫":"The other device received the vault",
+"配對碼連續錯誤三次，已停止分享":"Three wrong pairing codes in a row; sharing stopped",
+"已逾時，停止分享":"Timed out; sharing stopped",
+"已停止分享":"Sharing stopped",
+"位址格式不正確":"Invalid address",
+"無法連線，請確認位址正確、兩台裝置在同一網路，且來源裝置正在分享並停留在分享畫面；macOS 另須在「系統設定 → 隱私權與安全性 → 區域網路」允許 ArgoVault":"Cannot connect. Check the address, that both devices are on the same network, and that the source device is sharing with its share screen open. On macOS, also allow ArgoVault under System Settings > Privacy & Security > Local Network",
+"配對碼錯誤或連線中斷":"Wrong pairing code or connection lost",
+"資料格式不符，兩台裝置的 App 版本可能不同":"Unexpected data; the two devices may run different app versions",
+"無法開啟連接埠":"Cannot open a network port",
+"資料庫過大，無法分享":"Vault is too large to share",
 "啟用「{n}」的 Touch ID 解鎖":"enable Touch ID unlock for \"{n}\"",
 "解鎖設定檔「{n}」":"unlock profile \"{n}\"",
 "改用主碼":"Use master password",
@@ -778,7 +803,7 @@ function enter(){
  $("#prof").hidden=false;$("#prof").textContent=S.profile;$("#q").value="";render();armIdle();refreshBio();
 }
 function lock(){
- stopRev();clearTimeout(edT);clearTimeout(idle);clearTimeout(hidT);clipClear();S=null;pend=null;
+ syncClose();stopRev();clearTimeout(edT);clearTimeout(idle);clearTimeout(hidT);clipClear();S=null;pend=null;
  ["#dlgAuth","#dlg","#dlgImp","#dlgAsk","#dlgConv","#dlgPw","#dlgSet"].forEach(s=>{const d=$(s);if(d?.open)d.close()});
  ["#aPw","#uPw","#cPw","#cPw2","#cvPw","#askIn","#pwOld","#pwNew","#pwNew2"].forEach(s=>$(s).value="");$("#gOut").textContent="";
  $("#vault").hidden=true;$("#gate").hidden=false;$("#bLock").hidden=true;$("#prof").hidden=true;
@@ -1076,6 +1101,56 @@ document.addEventListener("visibilitychange",()=>{
  else{clearTimeout(hidT);if(S.ed)armEd()}
 });
 
+/* ---------- 裝置對裝置同步（整檔；Rust 端 sync.rs，僅 Tauri；取得的檔案走匯入備份流程） ---------- */
+const syncMsg=e=>{const[c,...d]=String(e).split(":"),m=SYNC_ERR[c];return m?t(m)+(d.length?"（"+d.join(":").trim()+"）":""):String(e)};
+const syncOn=!!tauriApi&&!afApi,SYNC_ERR={addr:"位址格式不正確",connect:"無法連線，請確認位址正確、兩台裝置在同一網路，且來源裝置正在分享並停留在分享畫面；macOS 另須在「系統設定 → 隱私權與安全性 → 區域網路」允許 ArgoVault",auth:"配對碼錯誤或連線中斷",proto:"資料格式不符，兩台裝置的 App 版本可能不同",bind:"無法開啟連接埠",size:"資料庫過大，無法分享"};
+let syT=null;
+function syncClose(){
+ clearInterval(syT);syT=null;
+ if(syncOn)tauriApi.core.invoke("sync_share_stop").catch(()=>{});
+ const d=$("#dlgSync");if(d.open)d.close();
+}
+function syncOpen(title){
+ const d=$("#dlgSync");$("#syErr").hidden=true;$("#syT").textContent=t(title);
+ $("#syNo").onclick=syncClose;d.oncancel=e=>{e.preventDefault();syncClose()};
+ return d;
+}
+/* Android 17 起連線區域網路需執行期權限；尚未允許時先請求，請使用者允許後再按一次 */
+function syncLan(){
+ try{if(!bioApi||typeof bioApi.lanOk==="undefined"||bioApi.lanOk())return true;bioApi.lanAsk()}catch{return true}
+ toast("請允許 ArgoVault 存取附近裝置（區域網路），允許後再按一次",1);return false;
+}
+async function syncShare(){
+ $(".more").open=false;if(!S||!syncLan())return;
+ let r;try{r=await tauriApi.core.invoke("sync_share_start",{name:S.profile,data:[...rawVault()]})}catch(e){return toast(syncMsg(e),1)}
+ const d=syncOpen("分享至其他裝置"),addr=(r.ip||t("（請至系統設定查看本機 IP）"))+(r.port!==r.defaultPort?":"+r.port:"");
+ $("#syBody").innerHTML=`<p class="note">${t("在另一台裝置選「從其他裝置同步」，輸入下列位址與配對碼。兩台裝置須在同一網路；完成、取消或 5 分鐘後自動停止分享。")}</p><label>${t("位址")}</label><div class="hash">${esc(addr)}</div><label>${t("配對碼")}</label><div class="hash" style="font-size:22px;letter-spacing:.2em">${esc(r.code)}</div>`;
+ $("#syOk").hidden=true;d.showModal();
+ syT=setInterval(async()=>{
+  const st=await tauriApi.core.invoke("sync_share_state").catch(()=>"stopped");
+  if(st==="waiting"||!syT)return;
+  syncClose();
+  toast(st==="done"?"對方已取得資料庫":st==="blocked"?"配對碼連續錯誤三次，已停止分享":st==="expired"?"已逾時，停止分享":"已停止分享",st!=="done");
+ },700);
+}
+function syncPull(){
+ $(".more").open=false;if(!syncLan())return;
+ const d=syncOpen("從其他裝置同步"),ok=$("#syOk"),er=$("#syErr");
+ $("#syBody").innerHTML=`<p class="note">${t("先在來源裝置解鎖，選「更多」裡的「分享至其他裝置」，再輸入它顯示的位址與配對碼。取得後會進入匯入備份畫面，由你決定設定檔名稱。")}</p><label for="syAddr">${t("位址")}</label><input id="syAddr" autocomplete="off" inputmode="url" placeholder="192.168.1.10"><label for="syCode">${t("配對碼")}</label><input id="syCode" autocomplete="off" inputmode="numeric" maxlength="6" enterkeyhint="go">`;
+ ok.hidden=false;ok.disabled=false;ok.textContent=t("同步");
+ ok.onclick=async()=>{
+  const addr=$("#syAddr").value.trim(),code=$("#syCode").value.trim();er.hidden=true;
+  if(!addr||!/^\d{6}$/.test(code)){er.textContent=t("請輸入位址與 6 位數配對碼");er.hidden=false;return}
+  ok.disabled=true;
+  try{const r=await tauriApi.core.invoke("sync_pull",{addr,code});syncClose();await importBackup(new File([Uint8Array.from(r.data)],String(r.name||"sync")+".bin"))}
+  catch(e){er.textContent=syncMsg(e);er.hidden=false;ok.disabled=false}
+ };
+ $("#syCode").onkeydown=e=>{if(isEnter(e)){e.preventDefault();ok.click()}};
+ d.showModal();$("#syAddr").focus();
+}
+["#bShare","#bSync","#bSyncG"].forEach(q=>$(q).hidden=!syncOn);
+$("#bShare").onclick=syncShare;$("#bSync").onclick=syncPull;$("#bSyncG").onclick=syncPull;
+
 /* ---------- 備份、CSV、刪除 ---------- */
 $("#bExp").onclick=async()=>{
  $(".more").open=false;
@@ -1287,7 +1362,7 @@ $("#dlgSet").addEventListener("click",async e=>{
 
 /* ---------- Android 返回鍵（由 MainActivity.kt 呼叫；回傳 true 表示已處理） ---------- */
 window.__pwBack=()=>{
- const layers=[["#dlgAsk","#askNo"],["#dlgAuth","#aNo"],["#dlgConv","#cvNo"],["#dlgPw","#pwNo"],["#dlgImp","#iNo"],["#dlg","#gClose"],["#dlgSet","#sClose"]];
+ const layers=[["#dlgSync","#syNo"],["#dlgAsk","#askNo"],["#dlgAuth","#aNo"],["#dlgConv","#cvNo"],["#dlgPw","#pwNo"],["#dlgImp","#iNo"],["#dlg","#gClose"],["#dlgSet","#sClose"]];
  for(const[d,b]of layers)if($(d).open){$(b).click();return true}
  if(!$("#busy").hidden)return true;
  if(S){

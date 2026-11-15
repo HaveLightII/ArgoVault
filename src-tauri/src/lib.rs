@@ -1,3 +1,5 @@
+mod sync;
+
 // 桌面生物辨識解鎖：macOS 為 Touch ID 加 Secure Enclave（macos/bio.swift），Windows 為 Windows Hello。
 // 兩者都是「包裝主碼」，註冊資料存 <AppData>/bio/<設定檔>.bio；回傳碼與 Android 的 PwBio 相同。
 #[cfg(any(target_os = "macos", target_os = "windows"))]
@@ -286,10 +288,21 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init());
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     let builder = builder.invoke_handler(tauri::generate_handler![
+        sync::sync_share_start,
+        sync::sync_share_state,
+        sync::sync_share_stop,
+        sync::sync_pull,
         bio::bio_init,
         bio::bio_remove,
         bio::bio_enroll,
         bio::bio_unlock
+    ]);
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let builder = builder.invoke_handler(tauri::generate_handler![
+        sync::sync_share_start,
+        sync::sync_share_state,
+        sync::sync_share_stop,
+        sync::sync_pull
     ]);
     builder
         .run(tauri::generate_context!())

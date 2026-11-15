@@ -19,6 +19,7 @@
 | 瀏覽器自動填入 | 實機 OK：已啟用、建議（自訂版面）清楚可見、解鎖正常、僅列符合紀錄、一次點擊即填入 |
 | 編輯前主碼對話框生物辨識、編輯頁複製鈕、編輯中離開不鎖庫 | 實機 OK（2026-11-13） |
 | macOS 生物辨識解鎖（Touch ID，見 6.6） | 實機 OK（2026-11-14） |
+| 裝置對裝置同步（整檔，見 6.8） | Mac 與 Android 17 雙向實機 OK（2026-11-15）；Windows、Android 對 Android 未測 |
 | macOS 自動填入 | 2026-11-14 決定放棄（無 Xcode 與簽署憑證） |
 | Windows 版 | 建置步驟見 7.1，含 Windows Hello 生物辨識解鎖（6.7）；實機建置與測試 OK（2026-11-14） |
 | Windows 自動填入 | 2026-11-14 決定暫緩，待生物辨識實機通過後再議（候選：全域快速鍵自動輸入、瀏覽器擴充功能） |
@@ -59,6 +60,7 @@
 
 - 設定檔：建立（選 PWV3、PWV2、PWV1，主碼二次確認，離線弱密碼檢查可關）、解鎖、匯入、刪除。紀錄：新增、編輯、單筆與多選刪除、依帳號名稱搜尋、備註（textarea，每行一筆）。  
 - 刪除（單筆、多選、資料庫）依序要求確認、PIN（已設定時）、主碼；刪資料庫另須輸入完整名稱。  
+- 裝置對裝置同步（僅 Tauri）：「更多」的「分享至其他裝置」與「從其他裝置同步」（解鎖頁也有後者），見 6.8。  
 - 「更多」選單：匯出備份（`.bin` 與 `.sha256`，Tauri 走系統儲存對話框並讀回驗證）、匯入備份（隱藏檔案選擇器，彈窗顯示檔名、大小、檔頭、偵測格式與 SHA-256）、匯入 CSV、轉換加密格式（新 salt，先解密比對，舊檔留 `.bin.bak`）、變更主碼、多選刪除、生物辨識解鎖啟用或停用。  
 - 「生成密碼」對話框、強度條（可關）、中英文介面（跟隨系統或手動，立即切換）。  
 - 所有 `confirm`、`prompt` 皆為自製 `<dialog id="dlgAsk">`；全頁 `user-select:none`（輸入框與 SHA-256 欄位例外）；`isEnter` 處理 Enter（忽略輸入法組字）。  
@@ -112,12 +114,12 @@
 | 檔案（相對於 `src-tauri/gen/android/app/`） | 職責 |
 | --- | --- |
 | `src/main/java/com/havelight/pypasswords/MainActivity.kt` | 狀態列內縮、`FLAG_SECURE`（監看 `secure.flag`）、返回鍵攔截、`onWebViewCreate` 掛上 `PwBio` |
-| 同目錄 `PwBio.kt` | 生物辨識橋接（Keystore 加 `BiometricPrompt`）、`afEnabled()`、`afSettings()` |
+| 同目錄 `PwBio.kt` | 生物辨識橋接（Keystore 加 `BiometricPrompt`）、`afEnabled()`、`afSettings()`、`lanOk()`、`lanAsk()` |
 | 同目錄 `ArgoAutofillService.kt` | `AutofillService`：解析欄位與 `webDomain`，回傳需驗證的 `Dataset` |
 | 同目錄 `AutofillAuthActivity.kt` | 驗證畫面：純 WebView 載入 `assets/argovault-af.html`；內含 `PwAF` 橋接 |
 | `src/main/res/xml/autofill_service.xml` | 自動填入服務設定 |
 | `src/main/res/layout/autofill_item.xml` | 自動填入建議的 `RemoteViews` 版面（固定深藍底 `#234E70`、白字、App 圖示，不隨系統主題） |
-| `src/main/AndroidManifest.xml` | `USE_BIOMETRIC` 權限、服務與驗證畫面宣告 |
+| `src/main/AndroidManifest.xml` | `USE_BIOMETRIC`、`ACCESS_LOCAL_NETWORK` 權限、服務與驗證畫面宣告 |
 | `build.gradle.kts` | `androidx.biometric:1.1.0`、`androidx.webkit:1.14.0`、`minSdk = 24`、任務 `syncAutofillAsset`（把 `src/index.html` 複製成 `assets/argovault-af.html`，掛在 `preBuild`） |
 | `proguard-rules.pro` | 保留 `PwBio`、`PwAF` 的 `@JavascriptInterface` 方法 |
 
@@ -129,7 +131,7 @@ JS 把 `1` 或 `0` 寫入 `<AppData>/secure.flag`；`MainActivity` 在 `onCreate
 
 JS `window.__pwBack()` 回傳 `true` 表示已處理；`MainActivity` 以 `OnBackPressedCallback` 攔截並 `evaluateJavascript`，結果不是 `"true"` 就 `finish()`。WebView 由走訪 `android.R.id.content` 取得。  
 
-- 順序：先關最上層對話框（檢查順序 `#dlgAsk`、`#dlgAuth`、`#dlgConv`、`#dlgPw`、`#dlgImp`、`#dlg`、`#dlgSet`，以其取消鈕 `click()`）；運算中不處理；編輯表單取消；多選結束；詳情回清單；搜尋有字則清空；清單最上層 `lock()` 並留在解鎖頁（2026-11-14 起不再退出，實機 OK）；建立分頁（已有設定檔）回解鎖分頁；解鎖頁退出。  
+- 順序：先關最上層對話框（檢查順序 `#dlgSync`、`#dlgAsk`、`#dlgAuth`、`#dlgConv`、`#dlgPw`、`#dlgImp`、`#dlg`、`#dlgSet`，以其取消鈕 `click()`）；運算中不處理；編輯表單取消；多選結束；詳情回清單；搜尋有字則清空；清單最上層 `lock()` 並留在解鎖頁（2026-11-14 起不再退出，實機 OK）；建立分頁（已有設定檔）回解鎖分頁；解鎖頁退出。  
 
 ### 6.4 生物辨識解鎖（已實機驗證）
 
@@ -191,6 +193,19 @@ adb install --no-incremental -r src-tauri/gen/android/app/build/outputs/apk/univ
 - 驗證狀態：Windows 專屬程式碼已在 macOS 上以 `cargo check --target x86_64-pc-windows-msvc` 通過型別檢查（獨立小專案，因主專案的資源編譯需要 Windows 工具）；之後使用者回報 Windows 實機實測通過（2026-11-14；檢查項目：建置、啟用、Windows Hello 解鎖、取消後以主碼解鎖、基本功能）。  
 - 未實測：未設定 Windows Hello 時的提示、變更主碼後更新、停用後金鑰是否刪除。  
 
+### 6.8 裝置對裝置同步（整檔，Mac 與 Android 實機 OK）
+
+- 用途：把一台裝置的設定檔密文（`.bin` 原樣）傳到另一台；不做逐筆合併，兩台各自改過時後匯入者會蓋掉另一方（覆蓋前照舊留 `.bin.bak`）。逐筆合併（每筆加修改時間與刪除標記）是後續選項，未做。  
+- Rust 端 `src-tauri/src/sync.rs`，所有平台共用（Android 亦同，manifest 已有 `INTERNET` 權限）；command：`sync_share_start(name, data)` 回傳 `ip`、`port`、`defaultPort`、`code`，`sync_share_state`（`waiting`、`done`、`blocked`、`expired`、`stopped`），`sync_share_stop`，`sync_pull(addr, code)` 回傳 `name`、`data`，錯誤碼 `addr`、`connect`、`auth`、`proto`。相依 `spake2`、`aes-gcm`。  
+- 協定：TCP，預設埠 47826（被占用時改用隨機埠，位址會顯示成 `IP:埠`）；訊框為 4 位元組大端長度加內容。以 6 位數配對碼做 SPAKE2（Ed25519 群）協商金鑰，之後全程 AES-256-GCM；被動竊聽者拿不到密文，也無法離線猜配對碼。配對碼錯三次、傳輸完成、取消、鎖定或 5 分鐘後停止監聽；一次分享只送出一次。  
+- 前端：`#dlgSync` 對話框，`syncShare`、`syncPull`、`syncClose`；拉取成功後把資料包成 `File` 交給既有的 `importBackup`（顯示 SHA-256、可改設定檔名稱、覆蓋確認）。`lock()` 會呼叫 `syncClose()`。瀏覽器版與自動填入畫面不顯示按鈕。  
+- 本機 IP 以 UDP socket 的 `local_addr` 推得（不送出封包），多網卡或無預設路由時可能不準或為空，此時提示自行查看。  
+- Android 區域網路權限（2026-11-15 實測的失敗原因）：Android 17（API 37）對 `targetSdk` 37 的 App 強制 `ACCESS_LOCAL_NETWORK`（執行期權限，屬「附近的裝置」群組）。未授權時 App 連不到區網位址，接受區網連線也間歇逾時；同一台手機的 adb shell 則連得上。處理：manifest 宣告該權限；`PwBio.lanOk()`、`PwBio.lanAsk()`（API 37 以下視為已允許）；前端 `syncLan()` 在分享與拉取前檢查，未授權就請求並提示再按一次。此強制行為係依實機現象與記憶中的 Android 文件判斷，未重新查證官方文件。  
+- macOS：`src-tauri/Info.plist`（Tauri 會併入 bundle）提供 `NSLocalNetworkUsageDescription`。App 在「系統設定 → 隱私權與安全性 → 區域網路」顯示為 `pypasswords`（ad-hoc 簽署的識別名稱 `pypasswords-<雜湊>`，目前重建後不變）。診斷過程曾誤判為 macOS 權限問題，實際上該開關一直是開的；`Info.plist` 是否必要未個別驗證。Mac 當分享端時防火牆未擋（防火牆開啟、未另行設定）。  
+- `sync_pull` 的 `connect` 錯誤會以冒號附上系統錯誤訊息（前端 `syncMsg` 顯示在括號內），用來分辨逾時、被拒或本機被擋。  
+- `sync_share_start` 結尾會對自己的連接埠自連一次：這是找到權限原因之前，依「本機連過一次後區網才連得上」的現象加的權宜處理，很可能已無必要；移除前需在 Android 17 上重測手機當分享端。  
+- 已驗證（2026-11-15）：Mac App 與 Android 17（SM-A1760）雙向同步實機成功；`cargo test --lib`（`sync::tests::roundTrip`：正確配對碼來回、錯誤配對碼被拒、錯三次停止、停止後狀態）。未驗證：Android 對 Android、Android 16 以下（SM-X210 裝的是沒有權限處理的較早版本）、Windows、錯誤配對碼與取消的介面流程、Android 進背景時的行為。  
+
 ### 7.1 Windows 建置（實機 OK）
 
 前置（Tauri, n.d.-b）：Microsoft C++ Build Tools（勾選「使用 C++ 的桌面開發」）、WebView2 Runtime（Windows 10 1803 以上與 Windows 11 已內建）、Rust（`stable-msvc` 工具鏈）、Node.js LTS、Git。於 PowerShell 執行：
@@ -241,7 +256,7 @@ npm run tauri build
 - 匯出的 `.bin` 與 `.sha256` 以 `sha256sum` 比對、以原 Python 版解密；JS 寫出的 PWV2 由 Python 解密。  
 - Android SAF 寫入是否截斷既有檔、`defaultPath` 是否生效；系統檔案對話框讓 App 進背景時為何不觸發 `pagehide` 鎖定（實測正常，原因未確認）。  
 - 禁止截圖的最近工作畫面縮圖細節；重開偶發卡頓的真正原因（目前未再重現，復發時收集 `adb logcat -v time | grep -iE "\[PW\]|pypasswords|AndroidRuntime|FATAL|ANR|chromium|tauri"`）。  
-- `allowBackup` 預設值；自有金鑰簽署；Windows Hello 的次要情境（見 6.7）；macOS 改過程式碼再重建後舊註冊是否仍可用、新增指紋後註冊失效（見 6.6）。  
+- `allowBackup` 預設值；自有金鑰簽署；Windows Hello 的次要情境（見 6.7）；裝置對裝置同步在 Windows 與 Android 對 Android 的實測（見 6.8）；macOS 改過程式碼再重建後舊註冊是否仍可用、新增指紋後註冊失效（見 6.6）。  
 
 ## 9. 已知限制與待辦
 
@@ -271,7 +286,7 @@ npm run tauri build
 
 ## 12. 交接時附上的檔案與快照指令
 
-必附：`HANDOFF.md`、`src/index.html`（單一前端來源）。做 Android 或 Tauri 相關工作時加附 6.1 表內的檔案，以及 `tauri.conf.json`、`capabilities/default.json`、`Cargo.toml`、`build.rs`、`lib.rs`、`main.rs`、`macos/bio.swift`、`package.json`；改文件時加附 `README.md`。不要附 `target/`、`node_modules/`、建置輸出、圖示、lock 檔、`.git`。  
+必附：`HANDOFF.md`、`src/index.html`（單一前端來源）。做 Android 或 Tauri 相關工作時加附 6.1 表內的檔案，以及 `tauri.conf.json`、`capabilities/default.json`、`Cargo.toml`、`build.rs`、`lib.rs`、`sync.rs`、`main.rs`、`macos/bio.swift`、`package.json`；改文件時加附 `README.md`。不要附 `target/`、`node_modules/`、建置輸出、圖示、lock 檔、`.git`。  
 
 完整快照（工作目錄的現況，含未提交修改）：
 
@@ -279,7 +294,7 @@ npm run tauri build
 cd ~/gits/ArgoVault
 a=src-tauri/gen/android/app
 k=$a/src/main/java/com/havelight/pypasswords
-tar -czf ~/ArgoVault_snapshot_$(date +%Y%m%d).tar.gz HANDOFF.md README.md package.json src/index.html src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/build.rs src-tauri/capabilities/default.json src-tauri/src/lib.rs src-tauri/src/main.rs src-tauri/macos/bio.swift $a/build.gradle.kts $a/proguard-rules.pro $a/src/main/AndroidManifest.xml $a/src/main/res/xml/autofill_service.xml $a/src/main/res/values/strings.xml $k/MainActivity.kt $k/PwBio.kt $k/ArgoAutofillService.kt $k/AutofillAuthActivity.kt $a/src/main/res/layout/autofill_item.xml
+tar -czf ~/ArgoVault_snapshot_$(date +%Y%m%d).tar.gz HANDOFF.md README.md package.json src/index.html src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/build.rs src-tauri/Info.plist src-tauri/capabilities/default.json src-tauri/src/lib.rs src-tauri/src/sync.rs src-tauri/src/main.rs src-tauri/macos/bio.swift $a/build.gradle.kts $a/proguard-rules.pro $a/src/main/AndroidManifest.xml $a/src/main/res/xml/autofill_service.xml $a/src/main/res/values/strings.xml $k/MainActivity.kt $k/PwBio.kt $k/ArgoAutofillService.kt $k/AutofillAuthActivity.kt $a/src/main/res/layout/autofill_item.xml
 tar -tzf ~/ArgoVault_snapshot_$(date +%Y%m%d).tar.gz
 ```
 
@@ -303,6 +318,7 @@ tar -czf ~/ArgoVault_min_$(date +%Y%m%d).tar.gz HANDOFF.md README.md src/index.h
 - 2026-11-14：放棄 macOS 自動填入；新增 macOS 生物辨識解鎖（Touch ID 加 Secure Enclave，見 6.6），實機通過。清單頁按返回鍵改為只鎖定、不退出 App（實機 OK，APK 於 macOS 主機建置）。版本改為 0.1.1（`tauri.conf.json`、`Cargo.toml`、`package.json` 與兩個 lock 檔），發佈 GitHub Release `0.1.1`（附 APK 與 arm64 `.dmg`；`.dmg` 建置已驗證，`.deb` 須在 Ubuntu 建置，未附）。  
 - 2026-11-14：新增 Windows 建置說明（7.1）、`.gitattributes`，`.gitignore` 加 `*.msi`、`*.exe`、`*.deb`；新增 Windows Hello 生物辨識解鎖（6.7），Windows 實機建置與測試通過；Windows 自動填入暫緩。  
 - 2026-11-15：匯出備份預設檔名改為 `argovault-<設定檔>-<YYYYMMDD>.bin`，`.sha256` 檔名跟隨實際儲存檔名（見第 3 節；macOS 實機 OK，Android、Windows 未重建、未測）。  
+- 2026-11-15：新增裝置對裝置同步（整檔，SPAKE2 加 AES-256-GCM，見 6.8），Mac 與 Android 17 雙向實機通過；Android 需 `ACCESS_LOCAL_NETWORK` 權限。  
 
 ## 參考資料
 
