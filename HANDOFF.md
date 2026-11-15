@@ -319,6 +319,7 @@ tar -czf ~/ArgoVault_min_$(date +%Y%m%d).tar.gz HANDOFF.md README.md src/index.h
 - 2026-11-14：新增 Windows 建置說明（7.1）、`.gitattributes`，`.gitignore` 加 `*.msi`、`*.exe`、`*.deb`；新增 Windows Hello 生物辨識解鎖（6.7），Windows 實機建置與測試通過；Windows 自動填入暫緩。  
 - 2026-11-15：匯出備份預設檔名改為 `argovault-<設定檔>-<YYYYMMDD>.bin`，`.sha256` 檔名跟隨實際儲存檔名（見第 3 節；macOS 實機 OK，Android、Windows 未重建、未測）。  
 - 2026-11-15：新增裝置對裝置同步（整檔，SPAKE2 加 AES-256-GCM，見 6.8），Mac 與 Android 17 雙向實機通過；Android 需 `ACCESS_LOCAL_NETWORK` 權限。  
+- 2026-11-15：版本改為 0.2.0，發佈 GitHub Release `0.2.0`（附 APK 與 arm64 `.dmg`；產物只確認建置與簽章，未安裝實測；未附 Windows 安裝檔與 `.deb`）。  
 
 ## 參考資料
 
