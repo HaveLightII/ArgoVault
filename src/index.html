@@ -648,14 +648,17 @@ async function storeDel(name){
  vaultCache.delete(name);
 }
 async function saveFile(name,data){
- if(!tauriApi){download(name,data);await new Promise(r=>setTimeout(r,400));return true}
+/* 回傳實際儲存的檔名（取消為 false）；Android 的 content URI 不一定帶檔名，認不出時回傳預設名稱 */
+ if(!tauriApi){download(name,data);await new Promise(r=>setTimeout(r,400));return name}
  const bytes=typeof data==="string"?enc.encode(data):data;
  const target=await tauriApi.dialog.save({defaultPath:name});
  if(!target)return false;
  await tauriApi.fs.writeFile(target,bytes);
  const back=await tauriApi.fs.readFile(target);
  if(back.length!==bytes.length)throw new Error("匯出檔大小不符，請重新匯出");
- return true;
+ const uri=/^content:/i.test(target);let p=String(target);if(uri)try{p=decodeURIComponent(p)}catch{}
+ const base=p.split(uri?/[\/:]/:/[\/\\]/).pop();
+ return base&&(!uri||/\.bin$/i.test(base))?base:name;
 }
 function askDlg(message,withInput,mode){
  return new Promise(resolve=>{
@@ -1076,10 +1079,12 @@ document.addEventListener("visibilitychange",()=>{
 /* ---------- 備份、CSV、刪除 ---------- */
 $("#bExp").onclick=async()=>{
  $(".more").open=false;
- const u=rawVault(),name=S.profile;
+ const u=rawVault(),d=new Date(),p2=n=>String(n).padStart(2,"0");
+ const name="argovault-"+S.profile+"-"+d.getFullYear()+p2(d.getMonth()+1)+p2(d.getDate())+".bin";
  try{
-  if(!await saveFile(name+".bin",u))return toast("已取消匯出",1);
-  if(!await saveFile(name+".bin.sha256",await sha(u)))return toast("已匯出備份，未儲存 SHA-256 檢查碼",1);
+  const saved=await saveFile(name,u);
+  if(!saved)return toast("已取消匯出",1);
+  if(!await saveFile(saved+".sha256",await sha(u)))return toast("已匯出備份，未儲存 SHA-256 檢查碼",1);
   toast("已匯出備份與 SHA-256 檢查碼");
  }catch(e){toast(e.message||String(e),1)}
 };
@@ -1093,7 +1098,7 @@ async function importBackup(file){
  $("#iInfo").innerHTML=`<p style="margin:0 0 8px"><b>${esc(file.name)}</b><br><span style="color:var(--mu)">${t("{n} 位元組，檔頭 {h}",{n:u.length,h:hex(u.slice(0,4))})}</span></p>
  <p style="margin:0 0 6px;color:${ok?"var(--ok)":"var(--dg)"}">${ok?t("格式：{f}",{f:fmtName(fmt)}):t("無法辨識：不是 PWV1、PWV2 或 PWV3 格式的資料庫")}</p>
  <label>SHA-256</label><div class="hash">${await sha(u)}</div>`;
- $("#iName").value=file.name.replace(/\.[^.]*$/,"").replace(/[^\w\-\u4e00-\u9fff]/g,"_");
+ $("#iName").value=file.name.replace(/\.[^.]*$/,"").replace(/^argovault-(.+)-\d{8}$/,"$1").replace(/[^\w\-\u4e00-\u9fff]/g,"_");
  $("#iErr").hidden=true;$("#iOk").disabled=!ok;$("#dlgImp").showModal();
 }
 $("#fImp").onchange=e=>{importBackup(e.target.files[0]);e.target.value=""};

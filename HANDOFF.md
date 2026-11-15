@@ -1,6 +1,6 @@
 # ArgoVault 交接文件
 
-最後更新：2026-11-14。原名 PyPasswords（2026-11-11 改名）。本文件不內嵌程式碼，程式以快照檔（第 12 節）一併提供。  
+最後更新：2026-11-15。原名 PyPasswords（2026-11-11 改名）。本文件不內嵌程式碼，程式以快照檔（第 12 節）一併提供。  
 
 ## 1. 專案與目前狀態
 
@@ -49,7 +49,7 @@
 
 - 明文為 JSON `{"records":[...]}`；紀錄欄位 `id`（`token_hex(4)`）、`accountType`、`accountName`、`password`、`linkedAccount`、`name`、`notes`（字串陣列），另有選填 `url`（網站網址，自動填入比對用；舊資料沒有）。  
 - 空資料庫最小長度：PWV2、PWV3 為 28 位元組（曾誤設 44，導致空庫無法解鎖）。  
-- 備份：複製 `.bin` 並另存 `<檔名>.sha256`。CSV 匯入欄位 `帳戶類型,帳號名稱,密碼,連結帳戶,姓名,備註`，另可選 `網址`；含「備註」的欄名皆為備註，單欄以 `;` 或 `；` 分隔。  
+- 備份：匯出預設檔名 `argovault-<設定檔>-<YYYYMMDD>.bin`（本地日期），檢查碼另存 `<實際儲存檔名>.sha256`（使用者在儲存對話框改名時跟著變；仍會跳第二次儲存對話框，因為檔案系統權限只涵蓋對話框選定的路徑。Android 的 content URI 認不出檔名時退回預設名稱）。匯入時若檔名符合 `argovault-<名稱>-<8 位數字>`，建議的設定檔名稱自動還原為 `<名稱>`。CSV 匯入欄位 `帳戶類型,帳號名稱,密碼,連結帳戶,姓名,備註`，另可選 `網址`；含「備註」的欄名皆為備註，單欄以 `;` 或 `；` 分隔。  
 - 密碼生成：長度 12 至 64；英數字加 `!@#$%^&*()-_=+[]{}`；須同時含小寫、大寫、數字、符號。  
 - 儲存位置：Tauri 內 `<AppData>/vault/<設定檔>.bin`（Android 上 AppData 實測就是 App 資料目錄根，`run-as` 列出 `./vault/...`），瀏覽器內 `localStorage` 鍵 `pwv:<profile>`（值為 base64）。設定在 `<AppData>/settings.json`（瀏覽器 `pwv-settings`）。  
 
@@ -302,6 +302,7 @@ tar -czf ~/ArgoVault_min_$(date +%Y%m%d).tar.gz HANDOFF.md README.md src/index.h
 - 2026-11-13：自動填入實機驗證通過；建議按鈕改自訂版面；編輯前主碼對話框加生物辨識；編輯頁加密碼複製鈕；編輯中切背景不鎖庫（見 9）；三項皆實機通過，自動填入相關檔案首次提交（`a7bee98`）。
 - 2026-11-14：放棄 macOS 自動填入；新增 macOS 生物辨識解鎖（Touch ID 加 Secure Enclave，見 6.6），實機通過。清單頁按返回鍵改為只鎖定、不退出 App（實機 OK，APK 於 macOS 主機建置）。版本改為 0.1.1（`tauri.conf.json`、`Cargo.toml`、`package.json` 與兩個 lock 檔），發佈 GitHub Release `0.1.1`（附 APK 與 arm64 `.dmg`；`.dmg` 建置已驗證，`.deb` 須在 Ubuntu 建置，未附）。  
 - 2026-11-14：新增 Windows 建置說明（7.1）、`.gitattributes`，`.gitignore` 加 `*.msi`、`*.exe`、`*.deb`；新增 Windows Hello 生物辨識解鎖（6.7），Windows 實機建置與測試通過；Windows 自動填入暫緩。  
+- 2026-11-15：匯出備份預設檔名改為 `argovault-<設定檔>-<YYYYMMDD>.bin`，`.sha256` 檔名跟隨實際儲存檔名（見第 3 節；macOS 實機 OK，Android、Windows 未重建、未測）。  
 
 ## 參考資料
 
