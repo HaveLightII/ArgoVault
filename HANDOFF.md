@@ -115,6 +115,7 @@
 | --- | --- |
 | `src/main/java/com/havelight/pypasswords/MainActivity.kt` | 狀態列內縮、`FLAG_SECURE`（監看 `secure.flag`）、返回鍵攔截、`onWebViewCreate` 掛上 `PwBio` |
 | 同目錄 `PwBio.kt` | 生物辨識橋接（Keystore 加 `BiometricPrompt`）、`afEnabled()`、`afSettings()`、`lanOk()`、`lanAsk()` |
+| 同目錄 `WebsiteSave.kt` | 網站登入資料暫存於程序記憶體，以限時、單次票證交給主畫面 |
 | 同目錄 `ArgoAutofillService.kt` | `AutofillService`：解析欄位與 `webDomain`，回傳需驗證的 `Dataset` |
 | 同目錄 `AutofillAuthActivity.kt` | 驗證畫面：純 WebView 載入 `assets/argovault-af.html`；內含 `PwAF` 橋接 |
 | `src/main/res/xml/autofill_service.xml` | 自動填入服務設定 |
@@ -152,6 +153,10 @@ JS `window.__pwBack()` 回傳 `true` 表示已處理；`MainActivity` 以 `OnBac
 - 使用者端設定：系統設定選 ArgoVault 為自動填入服務（設定頁有捷徑）；Chrome 設定的「自動填入服務」選「使用其他服務自動填入」（Android Developers Blog, 2024）。  
 - 已知限制：不支援先填帳號、下一頁才填密碼的多步驟登入；只針對 Chrome；網域取決於瀏覽器是否提供；`afUser` 是暫時做法（紀錄沒有專屬登入帳號欄位），不合用時可改為新增獨立欄位。  
 - 已驗證（2026-11-13）：資料集層級驗證一次點擊即填入；`profiles()` 找得到檔案；`assets/` 額外檔案未被清除。未驗證：Argon2id 的 Blob Worker 可在該 WebView 運作。  
+
+網站儲存使用 Android `SaveInfo`。使用者同意系統提示後，服務核對同一次請求的欄位 ID、表單與網站，透過一次性票證啟動主畫面。登入資料只傳給主畫面內建來源的 WebView。主程式使用既有的設定檔驗證與加密寫入流程，更新密碼前依網站來源與登入帳號精確比對並要求確認。手動取消、切到背景或逾時會清除待儲存資料。
+
+2026-11-19 於 SM-T500（Android 12）以 Chrome 提交本機測試表單，實測系統提示、選擇設定檔、主碼驗證、新增、確認更新與解密讀回。網站以 Android 提供的通訊協定與主機識別，本次 Chrome 未提供連接埠。PWV1 至 PWV3 的新增、重複略過、更新確認與取消另以測試資料驗證。
 
 ### 6.6 macOS 生物辨識解鎖（Touch ID，實機 OK）
 
@@ -222,11 +227,21 @@ npm run tauri build
 3：安裝 Tauri CLI。  
 4：建置；首次會自動下載 WiX 與 NSIS。產物在 `src-tauri\target\release\bundle\msi\`（`.msi`）與 `bundle\nsis\`（`-setup.exe`），免安裝執行檔為 `src-tauri\target\release\pypasswords.exe`。  
 
-- `build.rs` 的 Swift 編譯只在目標為 macOS 時執行；Windows 專屬程式碼只有 6.7 的生物辨識。  
+- `build.rs` 的 Swift 編譯只在目標為 macOS 時執行；Windows 專屬程式碼包括 6.7 的生物辨識與桌面瀏覽器原生通訊註冊。
 - 資料位置預期為 `%APPDATA%\com.havelight.pypasswords\`（`vault\`、`settings.json`）。  
 - 生物辨識為 Windows Hello（6.7）；無自動填入；禁止截圖與返回鍵只在 Android 有效。  
 - 安裝檔未簽署，SmartScreen 會警告。  
 - `.gitattributes` 固定 `src/index.html` 為 LF，避免 Git for Windows 轉成 CRLF。  
+
+### 桌面瀏覽器儲存網站密碼（Windows、macOS）
+
+擴充功能原始碼在 `browser-extension/`。Chrome 與 Edge 共用 Manifest V3、固定擴充功能 ID 及 Native Messaging 主機 `com.havelight.argovault`。一般 App 啟動時取得單一實例鎖。瀏覽器啟動相同執行檔的原生通訊模式，將已確認的請求透過具驗證的本機加密連線交給 App。儲存與更新沿用前端的網站密碼對話框與現有加密格式。
+
+App「設定 → 連接 Chrome／Edge」會從內嵌資源建立可載入的擴充功能資料夾，並將主機資訊寫入兩個瀏覽器的使用者層級註冊位置。macOS 使用 NativeMessagingHosts 目錄，Windows 使用 HKCU。完整安裝、逐站授權與表單限制見 README。若修改 manifest 的公鑰，須同步調整 Rust 主機允許的擴充功能來源。
+
+已用 macOS 的 Chrome 與 Edge，在獨立測試設定檔預先授予測試站點的瀏覽器權限，再透過擴充功能逐站啟用並提交 HTTPS 表單，經原生通訊新增與更新同一帳號，解密讀回後確認僅有一筆。Windows x64 執行檔在 Wine 驗證了 Native Messaging 訊框、通往模擬 App 接收端的加密傳輸，以及拒絕非授權擴充功能和 HTTP 網址。Windows 實機瀏覽器與 Windows Hello 的完整儲存流程待驗證。擴充功能的來源比對與單次領取測試可執行 `node --test tests/browser-extension.test.cjs`。
+
+平台規格見 [Chrome Native Messaging](https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging) 與 [Edge Native Messaging](https://learn.microsoft.com/en-us/microsoft-edge/extensions/developer-guide/native-messaging)。
 
 ## 8. 驗證狀態
 
@@ -294,7 +309,7 @@ npm run tauri build
 cd ~/gits/ArgoVault
 a=src-tauri/gen/android/app
 k=$a/src/main/java/com/havelight/pypasswords
-tar -czf ~/ArgoVault_snapshot_$(date +%Y%m%d).tar.gz HANDOFF.md README.md package.json src/index.html src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/build.rs src-tauri/Info.plist src-tauri/capabilities/default.json src-tauri/src/lib.rs src-tauri/src/sync.rs src-tauri/src/main.rs src-tauri/macos/bio.swift $a/build.gradle.kts $a/proguard-rules.pro $a/src/main/AndroidManifest.xml $a/src/main/res/xml/autofill_service.xml $a/src/main/res/values/strings.xml $k/MainActivity.kt $k/PwBio.kt $k/ArgoAutofillService.kt $k/AutofillAuthActivity.kt $a/src/main/res/layout/autofill_item.xml
+tar -czf ~/ArgoVault_snapshot_$(date +%Y%m%d).tar.gz HANDOFF.md README.md package.json src/index.html browser-extension/ src-tauri/src/browser/ src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/build.rs src-tauri/Info.plist src-tauri/capabilities/default.json src-tauri/src/lib.rs src-tauri/src/sync.rs src-tauri/src/main.rs src-tauri/macos/bio.swift $a/build.gradle.kts $a/proguard-rules.pro $a/src/main/AndroidManifest.xml $a/src/main/res/xml/autofill_service.xml $a/src/main/res/values/strings.xml $k/MainActivity.kt $k/PwBio.kt $k/ArgoAutofillService.kt $k/WebsiteSave.kt $k/AutofillAuthActivity.kt $a/src/main/res/layout/autofill_item.xml
 tar -tzf ~/ArgoVault_snapshot_$(date +%Y%m%d).tar.gz
 ```
 
@@ -320,6 +335,8 @@ tar -czf ~/ArgoVault_min_$(date +%Y%m%d).tar.gz HANDOFF.md README.md src/index.h
 - 2026-11-15：匯出備份預設檔名改為 `argovault-<設定檔>-<YYYYMMDD>.bin`，`.sha256` 檔名跟隨實際儲存檔名（見第 3 節；macOS 實機 OK，Android、Windows 未重建、未測）。  
 - 2026-11-15：新增裝置對裝置同步（整檔，SPAKE2 加 AES-256-GCM，見 6.8），Mac 與 Android 17 雙向實機通過；Android 需 `ACCESS_LOCAL_NETWORK` 權限。  
 - 2026-11-15：版本改為 0.2.0，發佈 GitHub Release `0.2.0`（附 APK 與 arm64 `.dmg`；產物只確認建置與簽章，未安裝實測；未附 Windows 安裝檔與 `.deb`）。  
+
+- 2026-11-19：0.3.0 新增 Android 以及桌面 Chrome／Edge 的網站密碼儲存提示。發行附件為 Android arm64-v8a APK 與 Apple Silicon DMG。APK 沿用 0.2.0 的 debug 簽署憑證，版本碼由 2000 升至 3000，已於 Android 14 模擬器覆蓋升級並啟動。DMG 已掛載核對版本、架構、ad-hoc 簽章及內嵌擴充功能。
 
 ## 參考資料
 

@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "ArgoVault",
+  "version": "1.0.0",
+  "description": "Save website logins to your local ArgoVault profiles.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAw3lPu8UB2wgBBHjL/Kw/S+SZdQaW2PGSIfBxrY8llsFuATEJ3rmW7NdUsmVk9H83cdSuZfJKoyUkG8mwUeVKuvaI1r1S8E+xv0muvJ+sYXNyf8aL6lY2FI+UtkAgVLmn9Hg+F0DVZk1GhECSNZt92BQIFmhSbyFZyiAy3S4pFCqgyPrBZMg6t3aWPUCpfwZonLv9tZAMVKj/pi9IGNbCixMX6J1KpIeem4O79VO6joxUo8kfnB9ZSVySjX3dhlY0QAdKyi09ImoWZyQ5NwKWxBXmezL95CkojTtHJ9cwjkANHgar32YNIrMbdLRhMqLqGso1JypRfd1tUu4cmZTLhwIDAQAB",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "nativeMessaging"
+  ],
+  "optional_host_permissions": [
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "ArgoVault"
+  }
+}

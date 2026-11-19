@@ -28,7 +28,8 @@ ArgoVault（原名 PyPasswords）是原 Python 命令列程式 `PyPasswords.py` 
 - 匯入 CSV：欄位為 `帳戶類型,帳號名稱,密碼,連結帳戶,姓名,備註`，備註欄可用 `;` 或 `；` 分隔多筆；可另加選填的 `網址` 欄。  
 - 管理資料：轉換加密格式、變更主碼、刪除資料庫。  
 - 生物辨識解鎖（僅 Android，選用）：每個設定檔可在「更多」啟用，之後解鎖頁出現生物辨識按鈕；主碼永遠可用；查看、新增、編輯、刪除等需再輸入主碼的對話框也可用生物辨識驗證。  
-- 瀏覽器自動填入（僅 Android，選用）：在系統設定選 ArgoVault 為自動填入服務後，於 Chrome 登入頁點欄位即出現建議，解鎖（主碼或生物辨識）後只列出網址符合的紀錄，點選即填入；每次填入都要解鎖，且不會寫入資料庫。  
+- 瀏覽器自動填入（僅 Android，選用）：在系統設定選 ArgoVault 為自動填入服務後，於 Chrome 登入頁點欄位即出現建議，解鎖（主碼或生物辨識）後只列出網址符合的紀錄，點選即填入；每次填入都要解鎖，填入操作只讀取資料庫。
+- 網站密碼儲存（Android 8 以上）：先建立 ArgoVault 設定檔，在 Android 選 ArgoVault 為自動填入服務，並在 Chrome 的自動填入服務設定選擇其他服務。提交支援的網站登入表單時，點系統的「儲存」，在 App 核對來源與帳號、選擇設定檔，以主碼或已啟用的生物辨識驗證。同一網站與帳號的密碼變更時會再詢問是否更新。
 - 介面語言：繁體中文、English、跟隨系統。  
 - 設定集中於「設定」對話框，見下方「設定項目」。  
 
@@ -59,6 +60,15 @@ ArgoVault（原名 PyPasswords）是原 Python 命令列程式 `PyPasswords.py` 
 ### 設定項目
 
 語言、預設加密格式、解鎖時自動轉換為預設格式、啟用密碼強度檢查、生成密碼預設長度、禁止截圖與螢幕錄影、閒置自動鎖定、切到背景後鎖定、查看密碼顯示時間、查看密碼前是否再次輸入主碼、自動填入的帳號欄位（僅 Android）、複製密碼後提醒清除剪貼簿、刪除用 PIN。設定存於 `settings.json`，不加密，PIN 只存雜湊。  
+
+### 從桌面 Chrome 或 Edge 儲存網站密碼
+
+1. 將 macOS 的 ArgoVault.app 放入「應用程式」，或將 Windows 壓縮檔完整解壓縮至固定資料夾。Windows 版需要 WebView2 Runtime。開啟 ArgoVault，先建立一個設定檔。
+2. 在 App 的「設定」按「連接 Chrome／Edge」，複製顯示的資料夾路徑。開啟 Chrome 的 `chrome://extensions` 或 Edge 的 `edge://extensions`，啟用開發人員模式，選「載入未封裝項目」並選取該資料夾。兩個瀏覽器都要使用時，各載入一次。
+3. 在要使用的 HTTPS 登入頁開啟 ArgoVault 擴充功能，按「在此網站啟用儲存提示」，並接受瀏覽器的網站權限。可從同一處逐站停用。
+4. 輸入並提交密碼後，在擴充功能視窗核對網站與帳號，再按「開啟 ArgoVault」。App 可從關閉狀態啟動。選擇設定檔，核對或補上帳號，以主碼或該設定檔已啟用的生物辨識完成儲存。同一來源與帳號的相同密碼會略過，密碼有變更會另行詢問是否更新。
+
+擴充功能支援最上層頁面的標準登入表單。網站授權按 HTTPS 來源區分，包含連接埠。嵌入式登入、同時有多個密碼欄的表單，以及沒有觸發表單提交事件的登入流程不會觸發提示。分頁式登入若只提供密碼，請在 App 補上帳號。擴充功能只保存已啟用的網站清單，待確認的帳密存於記憶體，逾時即失效。更新 App 後，可在瀏覽器擴充功能頁重新載入 ArgoVault 以套用新版。
 
 ### 在瀏覽器執行
 
@@ -99,7 +109,8 @@ Android 版已在三星 arm64 實機測試；macOS 版可建置，但尚未完�
 | `src/index.html` | 全部前端（介面、加密、儲存層） |
 | `src-tauri/` | Tauri 2 專案（Rust、設定、權限、圖示） |
 | `src-tauri/gen/android/` | Android 專案，含 `MainActivity.kt`（狀態列內縮、禁止截圖、返回鍵）、`PwBio.kt`（生物辨識橋接）、`ArgoAutofillService.kt` 與 `AutofillAuthActivity.kt`（自動填入服務與驗證畫面）、`res/layout/autofill_item.xml`（建議按鈕版面） |
-| `ArgoVault_HANDOFF.md` | 開發交接文件 |
+| `browser-extension/`、`src-tauri/src/browser/` | 桌面 Chrome／Edge 擴充功能與原生通訊 |
+| `HANDOFF.md` | 開發交接文件 |
 
 ### 已知限制
 
@@ -144,7 +155,8 @@ Opened directly in a browser, data is kept in `localStorage`; inside Tauri it is
 - CSV import: columns `帳戶類型,帳號名稱,密碼,連結帳戶,姓名,備註` (the Chinese headers are required); the notes column may hold several notes separated by `;` or `；`; an optional `網址` column may be added.  
 - Data management: convert encryption format, change the master password, delete a database.  
 - Biometric unlock (Android only, optional): enable it per profile under More; the unlock screen then shows a biometric button. The master password always works; the re-authentication dialogs (viewing, adding, editing, deleting and so on) also accept biometric verification.  
-- Browser autofill (Android only, optional): after choosing ArgoVault as the autofill service in system settings, tapping a field on a Chrome login page shows a suggestion; after unlocking (master password or biometrics) only records whose URL matches are listed, and one tap fills the fields. Every fill requires unlocking and nothing is written to the database.  
+- Browser autofill (Android only, optional): after choosing ArgoVault as the autofill service in system settings, tapping a field on a Chrome login page shows a suggestion; after unlocking (master password or biometrics) only records whose URL matches are listed, and one tap fills the fields. Every fill requires unlocking.
+- Save website passwords (Android 8+). Create a profile, select ArgoVault as the Android autofill service, and enable autofill using another service in Chrome. After submitting a supported login form, tap the system save prompt. Review the source and username, select a profile, and authenticate with the master password or enrolled biometrics. Updating an existing login requires confirmation.
 - UI language: Traditional Chinese, English, or follow the system.  
 - Preferences are collected in one Settings dialog (see "Settings" below).  
 
@@ -175,6 +187,15 @@ The plaintext is JSON: `{"records":[...]}`. Argon2id is a hand-written JavaScrip
 ### Settings
 
 Language, default encryption format, auto-convert to the default format on unlock, password strength check, default generated length, block screenshots and screen recording, idle auto-lock, lock after background, password reveal time, re-entering the master password before revealing a password, the field used as the autofill username (Android only), clipboard reminder after copying, and the deletion PIN. Settings are stored in `settings.json`, unencrypted; only a hash of the PIN is stored.  
+
+### Save website passwords from desktop Chrome or Edge
+
+1. Move ArgoVault.app to Applications on macOS, or extract the entire Windows archive into a permanent folder. Windows requires the WebView2 Runtime. Open the app and create a profile.
+2. In Settings, choose **Connect Chrome / Edge** and copy the folder path. Visit `chrome://extensions` in Chrome or `edge://extensions` in Edge, enable developer mode, and choose **Load unpacked**. Select the folder shown by the app. Repeat in each browser you use.
+3. On an HTTPS login page, open the ArgoVault extension, choose **Enable save prompts for this site**, and grant the browser permission. Open the same menu to disable prompts for that site.
+4. Enter and submit the password. Check the website and username in the extension window, then choose **Open ArgoVault**. This also starts the app if it is closed. Choose a profile, review or enter the username, and authenticate with the master password or enrolled biometrics. The app skips identical credentials and asks before updating a changed password for the same origin and username.
+
+The extension handles standard login forms in the top-level page. Site settings apply to the exact HTTPS origin, including its port. Embedded logins, forms with multiple password fields, and flows without a form submission event do not trigger prompts. For password-only steps you can enter the username in the app. The extension stores the enabled sites. Pending credentials stay in memory and expire. After updating the app, reload ArgoVault on the browser’s extensions page to apply extension changes.
 
 ### Run in a browser
 
@@ -215,7 +236,8 @@ The Android build has been tested on a Samsung arm64 device; the macOS build is 
 | `src/index.html` | The entire frontend (UI, cryptography, storage layer) |
 | `src-tauri/` | Tauri 2 project (Rust, configuration, permissions, icons) |
 | `src-tauri/gen/android/` | Android project, including `MainActivity.kt` (status bar insets, screenshot block, back key), `PwBio.kt` (biometric bridge), `ArgoAutofillService.kt` and `AutofillAuthActivity.kt` (autofill service and authentication screen), and `res/layout/autofill_item.xml` (suggestion layout) |
-| `ArgoVault_HANDOFF.md` | Development handoff document (Traditional Chinese) |
+| `browser-extension/`, `src-tauri/src/browser/` | Desktop Chrome / Edge extension and native messaging host |
+| `HANDOFF.md` | Development handoff document (Traditional Chinese) |
 
 ### Known limitations
 

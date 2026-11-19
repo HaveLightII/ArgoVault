@@ -1,11 +1,16 @@
 package com.havelight.pypasswords
 
+import android.content.Intent
 import android.os.Bundle
 import android.os.FileObserver
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.webkit.WebView
+import android.widget.Toast
+import androidx.webkit.JavaScriptReplyProxy
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.ViewCompat
@@ -15,8 +20,81 @@ import java.io.File
 class MainActivity : TauriActivity() {
   private val observers = mutableListOf<FileObserver>()
 
+  private var saveChannel: JavaScriptReplyProxy? = null
+  private var saveTicket: String? = null
+  private var delivered = false
+  private var foreground = false
+
+  private fun acceptSave(intent: Intent) {
+    val id = WebsiteSave.ticket(intent) ?: return
+    saveTicket = id
+    delivered = false
+    applySecure()
+    signalSave()
+  }
+
+  // A resumed Activity can still have a hidden WebView. Wait for the page to claim
+  // the request after visibilitychange before handing it the credentials.
+  private fun signalSave() {
+    if (foreground && !delivered && saveTicket != null) saveChannel?.postMessage("pending")
+  }
+
+  private fun deliverSave() {
+    val channel = saveChannel ?: return
+    val id = saveTicket ?: return
+    if (!foreground || delivered) return
+    val login = WebsiteSave.take(id)
+    if (login == null) {
+      val zh = resources.configuration.locales[0].language == "zh"
+      Toast.makeText(this, if (zh) "儲存請求已失效，請重新提交網站表單。" else "Save request expired. Submit the form again.", Toast.LENGTH_LONG).show()
+      clearSave()
+      return
+    }
+    delivered = true
+    channel.postMessage(login.put("id", id).toString())
+  }
+
+  private fun clearSave() {
+    saveTicket?.let { WebsiteSave.take(it) }
+    saveTicket = null
+    delivered = false
+    applySecure()
+  }
+
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    acceptSave(intent)
+  }
+
+  override fun onResume() {
+    super.onResume()
+    foreground = true
+    signalSave()
+  }
+
+  override fun onStop() {
+    foreground = false
+    if (saveTicket != null) {
+      saveChannel?.postMessage("{}")
+      clearSave()
+    }
+    super.onStop()
+  }
+
   override fun onWebViewCreate(webView: WebView) {
     webView.addJavascriptInterface(PwBio(this, webView), "PwBio")
+    if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+      val origins = setOf("http://tauri.localhost", "https://tauri.localhost")
+      WebViewCompat.addWebMessageListener(webView, "WebsiteSave", origins) { _, message, _, mainFrame, channel ->
+        if (mainFrame) {
+          when (message.data) {
+            "ready" -> { saveChannel = channel; signalSave() }
+            "claim" -> if (channel === saveChannel) deliverSave()
+            saveTicket -> clearSave()
+          }
+        }
+      }
+    }
     super.onWebViewCreate(webView)
   }
 
@@ -27,7 +105,7 @@ class MainActivity : TauriActivity() {
       try { it.exists() && it.readText().trim() == "1" } catch (e: Exception) { false }
     }
     runOnUiThread {
-      if (on) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+      if (on || saveTicket != null) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
       else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
     }
   }
@@ -60,6 +138,7 @@ class MainActivity : TauriActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
+    acceptSave(intent)
     applySecure()
     watch(dataDir)
     if (filesDir.path != dataDir.path) watch(filesDir)

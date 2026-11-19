@@ -167,6 +167,16 @@ body.af #bGen,body.af #bSet,body.af #bLock,body.af .tabs,body.af #bImpG,body.af 
 </section>
 </main>
 
+<dialog id="dlgSiteSave" aria-labelledby="siteSaveTitle">
+ <h3 id="siteSaveTitle">儲存網站密碼</h3>
+ <p id="siteSource" class="note" data-nt></p>
+ <label for="siteUser">登入帳號</label><input id="siteUser" autocomplete="off">
+ <label for="siteProfile">設定檔</label><select id="siteProfile" data-nt></select>
+ <label for="siteMaster">主碼</label><input type="password" id="siteMaster" autocomplete="off" enterkeyhint="go">
+ <p id="siteStatus" class="note" role="status" data-nt></p>
+ <button class="btn gh full" id="siteBio" type="button" hidden>使用生物辨識儲存</button>
+ <div class="fa"><button class="btn gh" id="siteCancel" type="button">取消</button><span class="sp"></span><button class="btn pri" id="siteSubmit" type="button">儲存</button></div>
+</dialog>
 <dialog id="dlg">
  <h3>生成密碼</h3>
  <div class="out" id="gOut" data-nt></div>
@@ -433,6 +443,23 @@ async function cfgSave(){
 const autoLang=()=>/^zh/i.test(navigator.language||"")?"zh":"en";
 let L=autoLang();
 const EN={
+"網站：{url}":"Website: {url}",
+"網站密碼儲存":"Save website passwords",
+"連接 Chrome／Edge":"Connect Chrome / Edge",
+"連接後，請在瀏覽器的擴充功能頁開啟開發人員模式，載入所列資料夾，再於 HTTPS 登入頁開啟 ArgoVault 擴充功能並啟用此網站。":"After connecting, enable Developer mode on the browser’s Extensions page, choose Load unpacked and select the folder shown. On an HTTPS login page, open the ArgoVault extension and enable that site.",
+"無法連接瀏覽器，請確認 App 安裝位置與使用者目錄權限。":"Could not connect the browser. Check the app location and user directory permissions.",
+"儲存網站密碼":"Save website password",
+"登入帳號":"Login username",
+"使用生物辨識儲存":"Save with biometrics",
+"請確認 {pkg} 提供的網站為 {url}":"Check the website reported by {pkg}: {url}",
+"儲存請求已失效，請重新提交網站表單。":"Save request expired. Submit the form again.",
+"請先完成目前的操作，再重新提交網站表單。":"Finish the current action, then submit the website form again.",
+"請先建立設定檔，再重新提交網站表單。":"Create a profile first, then submit the website form again.",
+"此帳號與密碼已儲存":"This login is already saved",
+"有多筆紀錄符合此網站與帳號，請在保管庫選擇要更新的紀錄。":"Several records match this website and username. Choose the record to update in the vault.",
+"要更新「{profile}」內 {url} 的帳號「{user}」密碼嗎？":"Update the password for “{user}” on {url} in profile “{profile}”?",
+"設定檔已變更，請重新驗證。":"The profile changed. Authenticate again.",
+"提交網站登入表單後，也可透過系統提示將密碼儲存到設定檔。":"After submitting a website login form, you can also save the password to a profile using the system prompt.",
 "請求來源：{s}":"Requested by: {s}",
 "無法取得請求來源":"Could not determine the request source",
 "目前顯示所有紀錄，請確認請求來源是你要登入的網站或 App 再選擇。":"Showing all records. Make sure the requester is the site or app you want to sign in to before choosing.",
@@ -898,6 +925,112 @@ async function bioRenew(name,pw){
  if(bioStatus()==="ok"){const r=await bioCall("enroll",name,b64(pw),t("更新生物辨識解鎖"),t("取消"));if(r.code==="ok")return toast("已更新生物辨識解鎖")}
  toast("生物辨識解鎖已停用，可稍後在「更多」重新啟用",1);
 }
+/* ---------- Android 與桌面瀏覽器的儲存請求 ---------- */
+const siteDialog=$("#dlgSiteSave"),siteChannel=window.WebsiteSave;
+const desktopSave=!!tauriApi&&!!window.PwBio?.desktop;
+function finishSiteRequest(id){
+ if(siteChannel)siteChannel.postMessage(id);
+ else if(desktopSave)tauriApi.core.invoke("browser_finish",{id}).catch(()=>{});
+}
+let siteRequest=null,siteTimer=null;
+function closeSiteSave(){
+ const req=siteRequest;if(!req)return;
+ siteRequest=null;clearTimeout(siteTimer);
+ if(req.confirming&&$("#dlgAsk").open)$("#askNo").click();
+ req.password="";
+ $("#siteMaster").value="";$("#siteUser").value="";$("#siteSource").textContent="";$("#siteStatus").textContent="";
+ siteDialog.close();finishSiteRequest(req.id);
+}
+function siteControls(busy){
+ for(const id of ["siteSubmit","siteBio","siteProfile","siteMaster","siteUser"])$("#"+id).disabled=busy;
+ $("#siteBio").hidden=!bioHas($("#siteProfile").value);
+}
+function receiveSiteSave(message){
+ if(message.data==="pending"){if(!document.hidden)siteChannel.postMessage("claim");return}
+ presentSiteSave(JSON.parse(message.data));
+}
+function presentSiteSave(req){
+ if(siteRequest?.writing){
+  if(req.id)finishSiteRequest(req.id);
+  return;
+ }
+ closeSiteSave();
+ if(!req.id)return;
+ const names=profiles();
+ if(!names.length||S?.ed||document.querySelector("dialog[open]")||!$("#busy").hidden||document.hidden){
+  finishSiteRequest(req.id);
+  return toast(names.length?"請先完成目前的操作，再重新提交網站表單。":"請先建立設定檔，再重新提交網站表單。",1);
+ }
+ siteRequest=req;
+ $("#siteSource").textContent=req.pkg?t("請確認 {pkg} 提供的網站為 {url}",req):t("網站：{url}",req);
+ $("#siteUser").value=req.user;
+ $("#siteProfile").replaceChildren(...names.map(name=>new Option(name,name)));
+ $("#siteProfile").value=S?.profile||$("#uSel").value||names[0];
+ $("#siteCancel").disabled=false;siteControls(false);
+ siteDialog.showModal();
+ siteTimer=setTimeout(()=>{if(!req.writing){closeSiteSave();toast("儲存請求已失效，請重新提交網站表單。",1)}},90000);
+}
+function siteOrigin(url){
+ if(!url)return "";
+ try{return new URL(url.includes("://")?url:"https://"+url).origin}catch{return ""}
+}
+async function saveSiteLogin(withBio){
+ const req=siteRequest,name=$("#siteProfile").value,user=$("#siteUser").value.trim();
+ const status=$("#siteStatus");
+ if(!req||req.busy)return;
+ if(!user){status.textContent=t("帳號名稱不可為空");$("#siteUser").focus();return}
+ let pw=enc.encode($("#siteMaster").value),opened;
+ $("#siteMaster").value="";
+ if(!withBio&&!pw.length){$("#siteMaster").focus();return}
+ req.busy=true;siteControls(true);status.textContent=t("解鎖中…");
+ try{
+  if(withBio){
+   const auth=await bioCall("unlock",name,t("生物辨識驗證"),t("改用主碼"));
+   if(siteRequest!==req)return;
+   if(auth.code==="cancel"){status.textContent="";return}
+   if(auth.code!=="ok")throw new Error(t("生物辨識失敗：{c}",{c:auth.code}));
+   pw.fill(0);pw=unb64(auth.data);
+  }
+  const raw=storeGet(name);
+  opened=await openVault(raw,pw);pw.fill(0);
+  if(siteRequest!==req)return;
+  const origin=siteOrigin(req.url);
+  const matches=opened.recs.filter(r=>origin&&siteOrigin(r.url)===origin&&(r[cfg.afUser]||r.accountName)===user);
+  if(matches.some(r=>r.password===req.password)){closeSiteSave();toast("此帳號與密碼已儲存");return}
+  if(matches.length>1)throw new Error("有多筆紀錄符合此網站與帳號，請在保管庫選擇要更新的紀錄。");
+  if(matches.length){
+   req.confirming=true;
+   const yes=await askYesNo(t("要更新「{profile}」內 {url} 的帳號「{user}」密碼嗎？",{profile:name,url:req.url,user}));
+   req.confirming=false;
+   if(siteRequest!==req)return;
+   if(!yes){closeSiteSave();return}
+   matches[0].password=req.password;
+  }else{
+   opened.recs.push({id:hex(rb(4)),accountType:"",accountName:user,linkedAccount:cfg.afUser==="linkedAccount"?user:"",name:"",notes:[],url:req.url,password:req.password});
+  }
+  status.textContent=t("加密儲存中…");
+  const bytes=await seal(opened.fmt,opened.salt,opened.keys,opened.recs);
+  if(siteRequest!==req)return;
+  if(storeGet(name)!==raw)throw new Error("設定檔已變更，請重新驗證。");
+  req.writing=true;$("#siteCancel").disabled=true;
+  await storePut(name,bytes);
+  if(S?.profile===name){stopRev();S.meta=metaOf(opened.recs);render()}
+  closeSiteSave();toast("已加密儲存");
+ }catch(e){if(siteRequest===req)status.textContent=t(e.message)}
+ finally{
+  drop(opened);pw.fill(0);
+  if(siteRequest===req){req.busy=false;req.writing=false;$("#siteCancel").disabled=false;siteControls(false)}
+ }
+}
+$("#siteSubmit").onclick=()=>saveSiteLogin(false);
+$("#siteBio").onclick=()=>saveSiteLogin(true);
+$("#siteMaster").onkeydown=e=>{if(isEnter(e)){e.preventDefault();saveSiteLogin(false)}};
+$("#siteCancel").onclick=closeSiteSave;
+$("#siteProfile").onchange=()=>{$("#siteMaster").value="";siteControls(false)};
+siteDialog.oncancel=e=>{e.preventDefault();if(!siteRequest?.writing)closeSiteSave()};
+document.addEventListener("visibilitychange",()=>{if(document.hidden&&!siteRequest?.writing)closeSiteSave()});
+addEventListener("pagehide",closeSiteSave);
+
 /* ---------- 自動填入（僅 AutofillAuthActivity 的 WebView，window.PwAF 存在時啟用） ---------- */
 const afReq=(()=>{try{return afApi?JSON.parse(afApi.request()):null}catch{return null}})()||{domain:"",pkg:""};
 const afHost=u=>{u=String(u||"").trim();if(!u)return"";try{if(!/^[a-z][a-z0-9+.-]*:\/\//i.test(u))u="https://"+u;return new URL(u).hostname.toLowerCase().replace(/^www\./,"")}catch{return""}};
@@ -1310,12 +1443,23 @@ function renderSet(){
  <label>${t("刪除用 PIN")}</label>
  <div class="pinrow"><span>${t(cfg.pin?"目前狀態：已設定":"目前狀態：未設定")}</span><span class="sp"></span><button class="btn mini" id="bPinSet" type="button">${t(cfg.pin?"變更 PIN":"設定 PIN")}</button>${cfg.pin?`<button class="btn mini dg" id="bPinClr" type="button">${t("移除 PIN")}</button>`:""}</div>
  <p class="hint">${t("刪除資料庫或紀錄（單筆與多選）時須輸入此 PIN。PIN 不參與加密，只能防誤刪與旁人操作，不能保護資料內容。")}</p>
+   ${desktopSave?`<h4>${t("網站密碼儲存")}</h4>
+  <button class="btn" id="bBrowserConnect" type="button">${t("連接 Chrome／Edge")}</button>
+  <p class="hint">${t("連接後，請在瀏覽器的擴充功能頁開啟開發人員模式，載入所列資料夾，再於 HTTPS 登入頁開啟 ArgoVault 擴充功能並啟用此網站。")}</p>
+  <p class="hash" id="browserPath" data-nt hidden></p>`:""}
    ${afSupported()?`<h4>${t("自動填入")}</h4>
   <div class="pinrow"><span>${t(afOn()?"目前狀態：已啟用":"目前狀態：未啟用")}</span><span class="sp"></span><button class="btn mini" id="bAfSet" type="button">${t("開啟系統設定")}</button></div>
   <label for="sAfUser">${t("填入的帳號欄位")}</label><select id="sAfUser">${opt("accountName",t("帳號名稱"),cfg.afUser)}${opt("linkedAccount",t("連結帳戶"),cfg.afUser)}</select>
-  <p class="hint">${t("啟用後，請在 Chrome 設定的「自動填入服務」選「使用其他服務自動填入」。紀錄需填寫「網站網址」才會自動比對；每次填入都要先解鎖。")}</p>`:""}
+  <p class="hint">${t("啟用後，請在 Chrome 設定的「自動填入服務」選「使用其他服務自動填入」。紀錄需填寫「網站網址」才會自動比對；每次填入都要先解鎖。")} ${t("提交網站登入表單後，也可透過系統提示將密碼儲存到設定檔。")}</p>`:""}
   <div class="fa"><button class="btn dg" id="sReset" type="button">${t("還原預設值")}</button><span class="sp"></span><button class="btn pri" id="sClose" type="button">${t("完成")}</button></div>`;
 }
+$("#dlgSet").addEventListener("click",async e=>{
+ if(e.target.id!=="bBrowserConnect")return;
+ const button=e.target,out=$("#browserPath");button.disabled=true;
+ try{out.textContent=await tauriApi.core.invoke("browser_connect")}
+ catch{out.textContent=t("無法連接瀏覽器，請確認 App 安裝位置與使用者目錄權限。")}
+ finally{out.hidden=false;button.disabled=false}
+});
 $("#bSet").onclick=()=>{renderSet();$("#dlgSet").showModal()};
 $("#dlgSet").addEventListener("click",e=>{if(e.target.id==="bAfSet"){try{bioApi.afSettings()}catch{}}});
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&$("#dlgSet").open&&afSupported())renderSet()});
@@ -1362,7 +1506,7 @@ $("#dlgSet").addEventListener("click",async e=>{
 
 /* ---------- Android 返回鍵（由 MainActivity.kt 呼叫；回傳 true 表示已處理） ---------- */
 window.__pwBack=()=>{
- const layers=[["#dlgSync","#syNo"],["#dlgAsk","#askNo"],["#dlgAuth","#aNo"],["#dlgConv","#cvNo"],["#dlgPw","#pwNo"],["#dlgImp","#iNo"],["#dlg","#gClose"],["#dlgSet","#sClose"]];
+ const layers=[["#dlgSync","#syNo"],["#dlgAsk","#askNo"],["#dlgSiteSave","#siteCancel"],["#dlgAuth","#aNo"],["#dlgConv","#cvNo"],["#dlgPw","#pwNo"],["#dlgImp","#iNo"],["#dlg","#gClose"],["#dlgSet","#sClose"]];
  for(const[d,b]of layers)if($(d).open){$(b).click();return true}
  if(!$("#busy").hidden)return true;
  if(S){
@@ -1387,6 +1531,21 @@ Promise.all([cfgLoad(),bioInit(),storeInit().catch(e=>toast(t("讀取資料庫�
  applyLang();
  try{await cfgFlag()}catch{}
  $("#bUnlock").disabled=false;refreshGate();
+ if(desktopSave){
+  const claim=async()=>{
+   if(document.hidden)return;
+   const req=await tauriApi.core.invoke("browser_claim");
+   if(req)presentSiteSave(req);
+  };
+  await tauriApi.event.listen("browser-save-pending",claim);
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)claim()});
+  await claim();
+ }
+ if(tauriApi&&siteChannel){
+  siteChannel.onmessage=receiveSiteSave;
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)siteChannel.postMessage("ready")});
+  siteChannel.postMessage("ready");
+ }
   if(afApi&&!profiles().length){toast("尚無設定檔，請先建立",1);setTimeout(()=>afApi.cancel(),1800)}
  console.log("[PW] storeInit 完成："+vaultCache.size+" 個設定檔，"+Math.round(performance.now())+" ms");
 });
