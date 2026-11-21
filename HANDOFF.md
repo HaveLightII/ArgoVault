@@ -1,6 +1,6 @@
 # ArgoVault 交接文件
 
-最後更新：2026-11-21（目前版本 0.3.0）。原名 PyPasswords（2026-11-11 改名）。本文件不內嵌程式碼，程式以快照檔（第 12 節）一併提供。  
+最後更新：2026-11-21（目前版本 0.3.1）。原名 PyPasswords（2026-11-11 改名）。本文件不內嵌程式碼，程式以快照檔（第 12 節）一併提供。  
 
 ## 1. 專案與目前狀態
 
@@ -343,6 +343,8 @@ tar -czf ~/ArgoVault_min_$(date +%Y%m%d).tar.gz HANDOFF.md README.md src/index.h
 - 2026-11-21：依程式碼校正本文件：6.7 至 6.9 移回第 6 節並編號；補 `opener` 外掛、`WebsiteSave` 橋接、`#dlgSiteSave` 返回鍵順序、桌面瀏覽器 Rust 模組；第 11 節兩項待辦已完成。  
 
 - 2026-11-21：解鎖後的搜尋改為同時比對帳戶類型（清單與多選「全選」共用 `searchHit`）。  
+
+- 2026-11-21：版本改為 0.3.1（版本碼 3001），發佈 GitHub Release `0.3.1`（附 arm64 APK 與 Apple Silicon `.dmg`，於 macOS 主機建置；產物只確認版本、架構與簽章，未安裝實測；未附 Windows 安裝檔）。打包 `.dmg` 若出現 `error running bundle_dmg.sh`，先以 `hdiutil info` 檢查並卸載殘留的 `rw.*.dmg` 暫存映像。  
 
 ## 參考資料
 
