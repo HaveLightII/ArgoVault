@@ -1,10 +1,10 @@
 # ArgoVault 交接文件
 
-最後更新：2026-11-15。原名 PyPasswords（2026-11-11 改名）。本文件不內嵌程式碼，程式以快照檔（第 12 節）一併提供。  
+最後更新：2026-11-21（目前版本 0.3.0）。原名 PyPasswords（2026-11-11 改名）。本文件不內嵌程式碼，程式以快照檔（第 12 節）一併提供。  
 
 ## 1. 專案與目前狀態
 
-本機多設定檔密碼庫，是原 Python 命令列程式 `PyPasswords.py` 的 HTML 重寫。前端為單一檔案 `src/index.html`（原生 JavaScript，無外部相依），以 Tauri 2 打包成 Android App；也可直接在瀏覽器開啟（資料存 `localStorage`，Tauri 內存 AppData 檔案，以 `window.__TAURI__` 自動切換）。  
+本機多設定檔密碼庫，是原 Python 命令列程式 `PyPasswords.py` 的 HTML 重寫。前端為單一檔案 `src/index.html`（原生 JavaScript，無外部相依），以 Tauri 2 打包成 Android、macOS、Windows App；也可直接在瀏覽器開啟（資料存 `localStorage`，Tauri 內存 AppData 檔案，以 `window.__TAURI__` 自動切換）。  
 
 - 倉庫：`git@github.com:HaveLightII/ArgoVault.git`（分支 `main`），本機 `~/gits/ArgoVault`。  
 - `identifier` 為 `com.havelight.pypasswords`，不可更動（改了等於另一個 App，資料不通）。crate 與 lib 名稱仍是 `pypasswords`、`libpypasswords_lib.so`（建置輸出已確認），刻意不改。  
@@ -22,7 +22,9 @@
 | 裝置對裝置同步（整檔，見 6.8） | Mac 與 Android 17 雙向實機 OK（2026-11-15）；Windows、Android 對 Android 未測 |
 | macOS 自動填入 | 2026-11-14 決定放棄（無 Xcode 與簽署憑證） |
 | Windows 版 | 建置步驟見 7.1，含 Windows Hello 生物辨識解鎖（6.7）；實機建置與測試 OK（2026-11-14） |
-| Windows 自動填入 | 2026-11-14 決定暫緩，待生物辨識實機通過後再議（候選：全域快速鍵自動輸入、瀏覽器擴充功能） |
+| Windows 自動填入 | 2026-11-14 決定暫緩（候選：全域快速鍵自動輸入、瀏覽器擴充功能）；Windows Hello 已實機通過，可再議 |
+| 網站密碼儲存提示（Android `SaveInfo`，見 6.5） | SM-T500（Android 12）Chrome 實機 OK（2026-11-19） |
+| 桌面 Chrome／Edge 儲存網站密碼（擴充功能，見 6.9） | macOS Chrome 與 Edge 實測 OK；Windows 僅在 Wine 驗證原生通訊，實機待驗證 |
 
 ## 2. 使用者偏好（需遵守）
 
@@ -102,26 +104,26 @@
 - `storeGet` 與 `rawVault` 是同步函式，依賴啟動時載入的 `vaultCache`，不可改成非同步。  
 - `askDlg` 與 `ask` 的 `onclose` 必須寫成 `if(!d.open)`，否則連續兩次使用同一對話框時，前一次延後送出的 `close` 事件會被當成第二次的取消。  
 - `authOpen(reason, soft)`：`soft` 為真（只有查看密碼）、`reauth` 為假且 `S.ses` 與檔頭 `fmt`、`salt` 相符時，直接 `unseal`，否則退回詢問主碼；成功後若 `reauth` 為假就快取金鑰。  
-- `ask(reason, bio)`：`bio` 為真且該設定檔已註冊生物辨識時，`#dlgAuth` 顯示「生物辨識驗證」鈕，成功即以主碼位元組走原流程；只有 `authOpen` 傳 `true`（查看、新增、編輯、刪除、匯入 CSV 皆可用，啟用生物辨識與變更主碼不用）。失敗訊息顯示在對話框內 `#aErr`（對話框在 top layer，`toast` 會被蓋住）；驗證後主碼無法開庫則停用註冊。
+- `ask(reason, bio)`：`bio` 為真且該設定檔已註冊生物辨識時，`#dlgAuth` 顯示「生物辨識驗證」鈕，成功即以主碼位元組走原流程；只有 `authOpen` 傳 `true`（查看、新增、編輯、刪除、匯入 CSV 皆可用，啟用生物辨識與變更主碼不用）。失敗訊息顯示在對話框內 `#aErr`（對話框在 top layer，`toast` 會被蓋住）；驗證後主碼無法開庫則停用註冊。  
 - 解鎖流程為 `doUnlock(name, pw, fromBio)`（主碼與生物辨識共用）；生物辨識解鎖後無法開庫（主碼已變）會自動停用該設定檔的註冊。  
-- 橋接物件（不存在時相關按鈕隱藏）：`window.PwBio`（生物辨識與自動填入設定；Android 為原生橋接，macOS 與 Windows Tauri 為前端 shim，見 6.6、6.7）、`window.PwAF`（僅 Android）（自動填入模式，`body.af`，只讀，解鎖後 `afList` 顯示比對清單，不建立 `S`）。  
+- 橋接物件（不存在時相關按鈕隱藏）：`window.PwBio`（生物辨識與自動填入設定；Android 為原生橋接，macOS 與 Windows Tauri 為前端 shim，見 6.6、6.7）、`window.WebsiteSave`（僅 Android，`MainActivity` 以 `WebViewCompat.addWebMessageListener` 掛上，傳遞待儲存的網站登入資料，前端對話框 `#dlgSiteSave`）、`window.PwAF`（僅 Android）（自動填入模式，`body.af`，只讀，解鎖後 `afList` 顯示比對清單，不建立 `S`）。  
 - 過去的陷阱：`lock()` 內不可引用不存在的元素 ID；鍵盤 `onkeydown` 對非 Enter 鍵不可 `return false`（會擋住倒退刪字）；`unseal` 最小長度 28。  
 
-## 6. Android 整合
+## 6. 平台整合（6.1 至 6.5 為 Android，6.6 起為桌面與跨平台）
 
 ### 6.1 檔案與職責
 
 | 檔案（相對於 `src-tauri/gen/android/app/`） | 職責 |
 | --- | --- |
-| `src/main/java/com/havelight/pypasswords/MainActivity.kt` | 狀態列內縮、`FLAG_SECURE`（監看 `secure.flag`）、返回鍵攔截、`onWebViewCreate` 掛上 `PwBio` |
+| `src/main/java/com/havelight/pypasswords/MainActivity.kt` | 狀態列內縮、`FLAG_SECURE`（監看 `secure.flag`，待儲存網站資料期間也強制開啟）、返回鍵攔截、`onWebViewCreate` 掛上 `PwBio` 與 `WebsiteSave` 訊息通道、接收網站儲存票證 |
 | 同目錄 `PwBio.kt` | 生物辨識橋接（Keystore 加 `BiometricPrompt`）、`afEnabled()`、`afSettings()`、`lanOk()`、`lanAsk()` |
-| 同目錄 `WebsiteSave.kt` | 網站登入資料暫存於程序記憶體，以限時、單次票證交給主畫面 |
-| 同目錄 `ArgoAutofillService.kt` | `AutofillService`：解析欄位與 `webDomain`，回傳需驗證的 `Dataset` |
+| 同目錄 `WebsiteSave.kt` | 網站登入資料暫存於程序記憶體，以限時（90 秒）、單次票證交給主畫面 |
+| 同目錄 `ArgoAutofillService.kt` | `AutofillService`：解析欄位與 `webDomain`，回傳需驗證的 `Dataset`，附 `SaveInfo`；`onSaveRequest` 交給 `WebsiteSave` |
 | 同目錄 `AutofillAuthActivity.kt` | 驗證畫面：純 WebView 載入 `assets/argovault-af.html`；內含 `PwAF` 橋接 |
 | `src/main/res/xml/autofill_service.xml` | 自動填入服務設定 |
 | `src/main/res/layout/autofill_item.xml` | 自動填入建議的 `RemoteViews` 版面（固定深藍底 `#234E70`、白字、App 圖示，不隨系統主題） |
-| `src/main/AndroidManifest.xml` | `USE_BIOMETRIC`、`ACCESS_LOCAL_NETWORK` 權限、服務與驗證畫面宣告 |
-| `build.gradle.kts` | `androidx.biometric:1.1.0`、`androidx.webkit:1.14.0`、`minSdk = 24`、任務 `syncAutofillAsset`（把 `src/index.html` 複製成 `assets/argovault-af.html`，掛在 `preBuild`） |
+| `src/main/AndroidManifest.xml` | `INTERNET`、`USE_BIOMETRIC`、`ACCESS_LOCAL_NETWORK` 權限、服務與驗證畫面宣告 |
+| `build.gradle.kts` | `androidx.biometric:1.1.0`、`androidx.webkit:1.14.0`、`minSdk = 24`、`compileSdk`／`targetSdk = 37`、任務 `syncAutofillAsset`（把 `src/index.html` 複製成 `assets/argovault-af.html`，掛在 `preBuild`） |
 | `proguard-rules.pro` | 保留 `PwBio`、`PwAF` 的 `@JavascriptInterface` 方法 |
 
 ### 6.2 禁止截圖
@@ -132,7 +134,7 @@ JS 把 `1` 或 `0` 寫入 `<AppData>/secure.flag`；`MainActivity` 在 `onCreate
 
 JS `window.__pwBack()` 回傳 `true` 表示已處理；`MainActivity` 以 `OnBackPressedCallback` 攔截並 `evaluateJavascript`，結果不是 `"true"` 就 `finish()`。WebView 由走訪 `android.R.id.content` 取得。  
 
-- 順序：先關最上層對話框（檢查順序 `#dlgSync`、`#dlgAsk`、`#dlgAuth`、`#dlgConv`、`#dlgPw`、`#dlgImp`、`#dlg`、`#dlgSet`，以其取消鈕 `click()`）；運算中不處理；編輯表單取消；多選結束；詳情回清單；搜尋有字則清空；清單最上層 `lock()` 並留在解鎖頁（2026-11-14 起不再退出，實機 OK）；建立分頁（已有設定檔）回解鎖分頁；解鎖頁退出。  
+- 順序：先關最上層對話框（檢查順序 `#dlgSync`、`#dlgAsk`、`#dlgSiteSave`、`#dlgAuth`、`#dlgConv`、`#dlgPw`、`#dlgImp`、`#dlg`、`#dlgSet`，以其取消鈕 `click()`）；運算中不處理；編輯表單取消；多選結束；詳情回清單；搜尋有字則清空；清單最上層 `lock()` 並留在解鎖頁（2026-11-14 起不再退出，實機 OK）；建立分頁（已有設定檔）回解鎖分頁；解鎖頁退出。  
 
 ### 6.4 生物辨識解鎖（已實機驗證）
 
@@ -148,15 +150,15 @@ JS `window.__pwBack()` 回傳 `true` 表示已處理；`MainActivity` 以 `OnBac
 - 鎖定時 `ArgoAutofillService` 不洩漏任何帳號，只回傳一個 `setAuthentication` 的 `Dataset`（欄位值為 `null`）；請求來自本 App 自己的畫面時略過；找不到密碼欄位時不回應；帳號欄位取密碼欄位前最近的文字欄位（優先看 `autofillHints` 與 HTML `type=email`）。  
 - `AutofillAuthActivity`：`FLAG_SECURE`、禁止導覽、`WebViewAssetLoader` 載入 `https://appassets.androidplatform.net/assets/argovault-af.html`，同時掛 `PwAF` 與 `PwBio`；`PwAF` 提供 `request()`、`profiles()`、`read(name, ext)`（只讀 `<dataDir>/vault/<name>.bin` 或 `.bin.bak`，拒絕含路徑字元的名稱）、`settings()`、`fill()`、`cancel()`。  
 - 比對（`afMatch`）：請求網域去掉 `www.` 後等於紀錄網址的主機，或為其子網域；`evil-example.com` 不符合 `example.com`。無網域（非瀏覽器）時，只在紀錄網址等於套件名稱時符合。沒有符合項目時須按「顯示所有紀錄」手動選，並顯示警告。不使用公共尾碼清單，網址不要填 `co.uk` 這類。  
-- 建議按鈕不可用 `android.R.layout.simple_list_item_1`：文字色來自深色主題而下拉底色為白，呈現空白方塊（實機截圖證實）；現用自訂版面 `autofill_item`，副標依系統語言（`zh` 或英文）。
+- 建議按鈕不可用 `android.R.layout.simple_list_item_1`：文字色來自深色主題而下拉底色為白，呈現空白方塊（實機截圖證實）；現用自訂版面 `autofill_item`，副標依系統語言（`zh` 或英文）。  
 - 切到背景或閒置 90 秒即取消；每次填入都要解鎖；不寫入 vault。  
 - 使用者端設定：系統設定選 ArgoVault 為自動填入服務（設定頁有捷徑）；Chrome 設定的「自動填入服務」選「使用其他服務自動填入」（Android Developers Blog, 2024）。  
 - 已知限制：不支援先填帳號、下一頁才填密碼的多步驟登入；只針對 Chrome；網域取決於瀏覽器是否提供；`afUser` 是暫時做法（紀錄沒有專屬登入帳號欄位），不合用時可改為新增獨立欄位。  
 - 已驗證（2026-11-13）：資料集層級驗證一次點擊即填入；`profiles()` 找得到檔案；`assets/` 額外檔案未被清除。未驗證：Argon2id 的 Blob Worker 可在該 WebView 運作。  
 
-網站儲存使用 Android `SaveInfo`。使用者同意系統提示後，服務核對同一次請求的欄位 ID、表單與網站，透過一次性票證啟動主畫面。登入資料只傳給主畫面內建來源的 WebView。主程式使用既有的設定檔驗證與加密寫入流程，更新密碼前依網站來源與登入帳號精確比對並要求確認。手動取消、切到背景或逾時會清除待儲存資料。
+網站儲存使用 Android `SaveInfo`。使用者同意系統提示後，服務核對同一次請求的欄位 ID、表單與網站，透過一次性票證啟動主畫面。登入資料只傳給主畫面內建來源的 WebView。主程式使用既有的設定檔驗證與加密寫入流程，更新密碼前依網站來源與登入帳號精確比對並要求確認。手動取消、切到背景或逾時會清除待儲存資料。  
 
-2026-11-19 於 SM-T500（Android 12）以 Chrome 提交本機測試表單，實測系統提示、選擇設定檔、主碼驗證、新增、確認更新與解密讀回。網站以 Android 提供的通訊協定與主機識別，本次 Chrome 未提供連接埠。PWV1 至 PWV3 的新增、重複略過、更新確認與取消另以測試資料驗證。
+2026-11-19 於 SM-T500（Android 12）以 Chrome 提交本機測試表單，實測系統提示、選擇設定檔、主碼驗證、新增、確認更新與解密讀回。網站以 Android 提供的通訊協定與主機識別，本次 Chrome 未提供連接埠。PWV1 至 PWV3 的新增、重複略過、更新確認與取消另以測試資料驗證。  
 
 ### 6.6 macOS 生物辨識解鎖（Touch ID，實機 OK）
 
@@ -167,31 +169,9 @@ JS `window.__pwBack()` 回傳 `true` 表示已處理；`MainActivity` 以 `OnBac
 - 已實測（2026-11-14）：ad-hoc 簽署的程式可建立並還原 Secure Enclave 金鑰；release `.app` 建置成功並可啟動；使用者回報實測通過（檢查項目：啟用時 Touch ID 只跳一次、Touch ID 解鎖、取消後仍可用主碼；原始碼未變動下重建 App 後舊註冊仍可解鎖）。未實測：改過程式碼再重建後舊註冊是否仍可用、新增指紋後失效。  
 - 已知限制：無 Touch ID 的 Mac 狀態為 `nohw`，按鈕仍顯示但會提示無法使用；`.bio` 檔不隨備份匯出，換機須重新啟用。  
 
-## 7. 建置與安裝（Ubuntu）
-
-環境：`ANDROID_HOME=$HOME/Android/Sdk`，NDK `27.2.12479018`，JDK 17，Rust 目標 `aarch64-linux-android`，簽署工具 `~/bin/uber-apk-signer-1.3.0.jar`（內含 zipalign 與 debug 金鑰）。Tauri 外掛：`fs`、`dialog`、`clipboard-manager`，權限在 `capabilities/default.json`，`app.withGlobalTauri` 為 `true`。  
-
-```
-cd ~/gits/ArgoVault
-npm run tauri android build -- --apk --target aarch64
-java -jar ~/bin/uber-apk-signer-1.3.0.jar -a src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk
-adb install --no-incremental -r src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-aligned-debugSigned.apk
-```
-
-1：進入專案。  
-2：建置 release APK；改了 `src/index.html` 必須重建才會更新（也會經 `syncAutofillAsset` 複製給自動填入畫面）。  
-3：以 debug 金鑰對齊並簽署。  
-4：覆蓋安裝；`--no-incremental` 避免這支手機不支援增量安裝的錯誤訊息。  
-
-- 簽章與先前不同時會出現 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`，須先匯出備份再 `adb uninstall com.havelight.pypasswords`（等於清空資料）。release 版不能用 `run-as`。  
-- 圖示：`app-icon.png`（1024×1024、透明背景、主體在中央約 66%）執行 `npm run tauri icon app-icon.png -- --ios-color "#234e70"`；圖示不更新是啟動器快取。  
-- 自有金鑰簽署尚未執行：流程為 `keytool` 產生 `.jks`、`zipalign`、`apksigner sign`；金鑰遺失即無法原地更新，執行前先匯出 vault 並備份金鑰與密碼。  
-- macOS：`npm run tauri build -- --bundles app` 產生 `src-tauri/target/release/bundle/macos/ArgoVault.app`（ad-hoc 簽署，已驗證可建置與啟動；最低系統版本 11.0）；`.dmg`（`--bundles app,dmg`）可建置；視窗寬度低於 820 會顯示手機版面；禁止截圖與返回鍵只在 Android 有效。  
-- 編譯警告（`setValue` 棄用、AGP 的 `android.newDsl` 等）皆可忽略。  
-
 ### 6.7 Windows 生物辨識解鎖（Windows Hello，實機 OK）
 
-- 同樣包裝主碼，command 與前端 shim 與 6.6 共用；實作在 `lib.rs` 的 `bio::imp`（`cfg(target_os = "windows")`），相依 `windows`、`aes-gcm`、`sha2`（僅 Windows 目標）。  
+- 同樣包裝主碼，command 與前端 shim 與 6.6 共用；實作在 `lib.rs` 的 `bio::imp`（`cfg(target_os = "windows")`），相依 `windows`、`sha2`（僅 Windows 目標）與共用的 `aes-gcm`。  
 - 做法：每設定檔一把 `KeyCredential`（名稱 `ArgoVault-<設定檔>`，有 TPM 時由硬體保護），對隨機 32 位元組挑戰值 `RequestSignAsync`（觸發 Windows Hello），以 SHA-256(`"ArgoVault-bio-v1"` 加簽章) 為 AES-256-GCM 金鑰加密主碼；挑戰值、nonce、密文存 `<AppData>\bio\<設定檔>.bio`（Microsoft, n.d.）。前提是簽章為確定性（RSA PKCS#1 v1.5）；實機解鎖成功，與此相符。  
 - 回傳碼：使用者取消或選擇密碼為 `cancel`，裝置鎖定為 `lockout`，金鑰不存在或解密失敗為 `invalidated`。`status` 依 `IsSupportedAsync`，未設定 Windows Hello 時為 `unenrolled`。  
 - 啟用時預期跳兩次 Windows Hello（建立金鑰一次、簽章一次）；對話框無法自訂說明文字。`focusPrompt` 會輪詢 `Credential Dialog Xaml Host` 視窗並帶到前景，避免對話框開在 App 後方。  
@@ -211,9 +191,41 @@ adb install --no-incremental -r src-tauri/gen/android/app/build/outputs/apk/univ
 - `sync_share_start` 結尾會對自己的連接埠自連一次：這是找到權限原因之前，依「本機連過一次後區網才連得上」的現象加的權宜處理，很可能已無必要；移除前需在 Android 17 上重測手機當分享端。  
 - 已驗證（2026-11-15）：Mac App 與 Android 17（SM-A1760）雙向同步實機成功；`cargo test --lib`（`sync::tests::roundTrip`：正確配對碼來回、錯誤配對碼被拒、錯三次停止、停止後狀態）。未驗證：Android 對 Android、Android 16 以下（SM-X210 裝的是沒有權限處理的較早版本）、Windows、錯誤配對碼與取消的介面流程、Android 進背景時的行為。  
 
+### 6.9 桌面瀏覽器儲存網站密碼（Windows、macOS）
+
+擴充功能原始碼在 `browser-extension/`，Rust 端在 `src-tauri/src/browser/`（`mod.rs`：單一實例、原生通訊與 command `browser_claim`、`browser_finish`；`install.rs`：`browser_connect`），僅 macOS 與 Windows 編譯，另相依 `dirs`、`tempfile`，Windows 加 `winreg`。Chrome 與 Edge 共用 Manifest V3、固定擴充功能 ID 及 Native Messaging 主機 `com.havelight.argovault`。一般 App 啟動時取得單一實例鎖。瀏覽器啟動相同執行檔的原生通訊模式，將已確認的請求透過具驗證的本機加密連線交給 App。儲存與更新沿用前端的網站密碼對話框與現有加密格式。  
+
+App「設定 → 連接 Chrome／Edge」會從內嵌資源建立可載入的擴充功能資料夾，並將主機資訊寫入兩個瀏覽器的使用者層級註冊位置。macOS 使用 NativeMessagingHosts 目錄，Windows 使用 HKCU。完整安裝、逐站授權與表單限制見 README。若修改 manifest 的公鑰，須同步調整 Rust 主機允許的擴充功能來源。  
+
+已用 macOS 的 Chrome 與 Edge，在獨立測試設定檔預先授予測試站點的瀏覽器權限，再透過擴充功能逐站啟用並提交 HTTPS 表單，經原生通訊新增與更新同一帳號，解密讀回後確認僅有一筆。Windows x64 執行檔在 Wine 驗證了 Native Messaging 訊框、通往模擬 App 接收端的加密傳輸，以及拒絕非授權擴充功能和 HTTP 網址。Windows 實機瀏覽器與 Windows Hello 的完整儲存流程待驗證。擴充功能的來源比對與單次領取測試可執行 `node --test tests/browser-extension.test.cjs`。  
+
+平台規格見 [Chrome Native Messaging](https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging) 與 [Edge Native Messaging](https://learn.microsoft.com/en-us/microsoft-edge/extensions/developer-guide/native-messaging)。  
+
+## 7. 建置與安裝（Android 與 macOS）
+
+環境（Ubuntu 主機；macOS 主機的 NDK 與簽署工具檔名不同，見第 2 節）：`ANDROID_HOME=$HOME/Android/Sdk`，NDK `27.2.12479018`，JDK 17，Rust 目標 `aarch64-linux-android`，簽署工具 `~/bin/uber-apk-signer-1.3.0.jar`（內含 zipalign 與 debug 金鑰）。Tauri 外掛：`fs`、`dialog`、`clipboard-manager`、`opener`，權限在 `capabilities/default.json`，`app.withGlobalTauri` 為 `true`。  
+
+```
+cd ~/gits/ArgoVault
+npm run tauri android build -- --apk --target aarch64
+java -jar ~/bin/uber-apk-signer-1.3.0.jar -a src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk
+adb install --no-incremental -r src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-aligned-debugSigned.apk
+```
+
+1：進入專案。  
+2：建置 release APK；改了 `src/index.html` 必須重建才會更新（也會經 `syncAutofillAsset` 複製給自動填入畫面）。  
+3：以 debug 金鑰對齊並簽署。  
+4：覆蓋安裝；`--no-incremental` 避免這支手機不支援增量安裝的錯誤訊息。  
+
+- 簽章與先前不同時會出現 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`，須先匯出備份再 `adb uninstall com.havelight.pypasswords`（等於清空資料）。release 版不能用 `run-as`。  
+- 圖示：`app-icon.png`（1024×1024、透明背景、主體在中央約 66%）執行 `npm run tauri icon app-icon.png -- --ios-color "#234e70"`；圖示不更新是啟動器快取。  
+- 自有金鑰簽署尚未執行：流程為 `keytool` 產生 `.jks`、`zipalign`、`apksigner sign`；金鑰遺失即無法原地更新，執行前先匯出 vault 並備份金鑰與密碼。  
+- macOS：`npm run tauri build -- --bundles app` 產生 `src-tauri/target/release/bundle/macos/ArgoVault.app`（ad-hoc 簽署，已驗證可建置與啟動；最低系統版本 11.0）；`.dmg`（`--bundles app,dmg`）可建置；視窗寬度低於 820 會顯示手機版面；禁止截圖與返回鍵只在 Android 有效。  
+- 編譯警告（`setValue` 棄用、AGP 的 `android.newDsl` 等）皆可忽略。  
+
 ### 7.1 Windows 建置（實機 OK）
 
-前置（Tauri, n.d.-b）：Microsoft C++ Build Tools（勾選「使用 C++ 的桌面開發」）、WebView2 Runtime（Windows 10 1803 以上與 Windows 11 已內建）、Rust（`stable-msvc` 工具鏈）、Node.js LTS、Git。於 PowerShell 執行：
+前置（Tauri, n.d.-b）：Microsoft C++ Build Tools（勾選「使用 C++ 的桌面開發」）、WebView2 Runtime（Windows 10 1803 以上與 Windows 11 已內建）、Rust（`stable-msvc` 工具鏈）、Node.js LTS、Git。於 PowerShell 執行：  
 
 ```
 git clone git@github.com:HaveLightII/ArgoVault.git
@@ -227,21 +239,11 @@ npm run tauri build
 3：安裝 Tauri CLI。  
 4：建置；首次會自動下載 WiX 與 NSIS。產物在 `src-tauri\target\release\bundle\msi\`（`.msi`）與 `bundle\nsis\`（`-setup.exe`），免安裝執行檔為 `src-tauri\target\release\pypasswords.exe`。  
 
-- `build.rs` 的 Swift 編譯只在目標為 macOS 時執行；Windows 專屬程式碼包括 6.7 的生物辨識與桌面瀏覽器原生通訊註冊。
+- `build.rs` 的 Swift 編譯只在目標為 macOS 時執行；Windows 專屬程式碼包括 6.7 的生物辨識與桌面瀏覽器原生通訊註冊。  
 - 資料位置預期為 `%APPDATA%\com.havelight.pypasswords\`（`vault\`、`settings.json`）。  
 - 生物辨識為 Windows Hello（6.7）；無自動填入；禁止截圖與返回鍵只在 Android 有效。  
 - 安裝檔未簽署，SmartScreen 會警告。  
 - `.gitattributes` 固定 `src/index.html` 為 LF，避免 Git for Windows 轉成 CRLF。  
-
-### 桌面瀏覽器儲存網站密碼（Windows、macOS）
-
-擴充功能原始碼在 `browser-extension/`。Chrome 與 Edge 共用 Manifest V3、固定擴充功能 ID 及 Native Messaging 主機 `com.havelight.argovault`。一般 App 啟動時取得單一實例鎖。瀏覽器啟動相同執行檔的原生通訊模式，將已確認的請求透過具驗證的本機加密連線交給 App。儲存與更新沿用前端的網站密碼對話框與現有加密格式。
-
-App「設定 → 連接 Chrome／Edge」會從內嵌資源建立可載入的擴充功能資料夾，並將主機資訊寫入兩個瀏覽器的使用者層級註冊位置。macOS 使用 NativeMessagingHosts 目錄，Windows 使用 HKCU。完整安裝、逐站授權與表單限制見 README。若修改 manifest 的公鑰，須同步調整 Rust 主機允許的擴充功能來源。
-
-已用 macOS 的 Chrome 與 Edge，在獨立測試設定檔預先授予測試站點的瀏覽器權限，再透過擴充功能逐站啟用並提交 HTTPS 表單，經原生通訊新增與更新同一帳號，解密讀回後確認僅有一筆。Windows x64 執行檔在 Wine 驗證了 Native Messaging 訊框、通往模擬 App 接收端的加密傳輸，以及拒絕非授權擴充功能和 HTTP 網址。Windows 實機瀏覽器與 Windows Hello 的完整儲存流程待驗證。擴充功能的來源比對與單次領取測試可執行 `node --test tests/browser-extension.test.cjs`。
-
-平台規格見 [Chrome Native Messaging](https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging) 與 [Edge Native Messaging](https://learn.microsoft.com/en-us/microsoft-edge/extensions/developer-guide/native-messaging)。
 
 ## 8. 驗證狀態
 
@@ -254,9 +256,9 @@ App「設定 → 連接 Chrome／Edge」會從內嵌資源建立可載入的擴�
 
 ### 8.2 自動填入實機結果
 
-2026-11-13 實機：第 1 至 4 項與第 7 項（APK 內有 `argovault-af.html`）通過，建議按鈕外觀修正後正常。第 5 項（自家登入畫面不出現建議、無設定檔時提示）、第 6 項（失敗蒐集用）尚未實測。
+2026-11-13 實機：第 1 至 4 項與第 7 項（APK 內有 `argovault-af.html`）通過，建議按鈕外觀修正後正常。第 5 項（自家登入畫面不出現建議、無設定檔時提示）、第 6 項（失敗蒐集用）尚未實測。  
 
-檢查清單：
+檢查清單：  
 
 1. 設定頁狀態顯示「已啟用」；Chrome 已選「使用其他服務自動填入」。  
 2. 紀錄填了「網站網址」後，登入頁點欄位出現「ArgoVault」建議。  
@@ -278,7 +280,7 @@ App「設定 → 連接 Chrome／Edge」會從內嵌資源建立可載入的擴�
 - 每次驗證都重跑 KDF；Argon2id 單 lane 的 JS 版不會更快，真正加速需 WebAssembly（容器無網路，未試）。  
 - 瀏覽器版資料綁定瀏覽器與網址來源；Tauri 版解除安裝即清空，更換簽章前必須先匯出備份。  
 - 設定檔不加密，PIN 與設定可被能讀取 App 資料的人修改，與「裝置本身需可信」一致。  
-- 備註逐筆編輯尚未實作；搜尋只比對 `accountName`。
+- 備註逐筆編輯尚未實作；搜尋只比對 `accountName`。  
 - 編輯中切到背景（2026-11-13 起）：不取消編輯、不啟動背景鎖定計時，密碼欄改回遮罩，編輯逾時延長為 5 分鐘；逾時才取消編輯並重啟閒置與背景鎖定計時。閒置鎖定在編輯中不觸發；`pagehide` 在編輯中不鎖定。編輯頁密碼旁有「複製」鈕，複製欄位目前的值。  
 - 建議但未決定：`AndroidManifest.xml` 設 `android:allowBackup="false"`（避免 vault 與生物辨識密文被備份；檢查 `grep -rn allowBackup src-tauri/gen/android/app/src/main/AndroidManifest.xml`）；記住上次使用的設定檔；提醒訊息改為需確認的對話框。  
 - 自動填入後續：視實測決定資料集層級或回應層級驗證、是否新增專屬登入帳號欄位、是否支援多步驟登入與其他瀏覽器。  
@@ -295,15 +297,15 @@ App「設定 → 連接 Chrome／Edge」會從內嵌資源建立可載入的擴�
 ## 11. Git
 
 - 倉庫 `HaveLightII/ArgoVault`，遠端為 SSH，`main` 已推送。`src-tauri/gen/android`、`src-tauri/icons`、`app-icon.png`、兩個 lock 檔納入版控；絕不納入金鑰（`*.jks`、`*.keystore`、`keystore.properties`）、`*.apk`、`*.dmg`、`node_modules`、`src-tauri/target`、vault 資料（`*.bin`、`*.sha256`、`*.bak`、`*.tmp`），規則在根目錄 `.gitignore`。  
-- 2026-11-13 提交 `a7bee98` 才首次納入自動填入相關檔案（先前一直是未追蹤或未提交）。`src-tauri/gen/android/app/src/main/assets/argovault-af.html` 是 `syncAutofillAsset` 每次建置從 `src/index.html` 複製的產物，應列入 `.gitignore` 並 `git rm --cached`（已建議，待使用者執行）。
-- 待清：根目錄的 `index.html.before-patch`（舊備份，已被追蹤）建議 `git rm`。  
+- 2026-11-13 提交 `a7bee98` 才首次納入自動填入相關檔案（先前一直是未追蹤或未提交）。`src-tauri/gen/android/app/src/main/assets/argovault-af.html` 是 `syncAutofillAsset` 每次建置從 `src/index.html` 複製的產物，已列入 `.gitignore` 並停止追蹤（`c8edaed`）。  
+- 根目錄的舊備份 `index.html.before-patch` 已移除（`a67124c`）。  
 - 提交前檢查：`git ls-files | grep -E '\.(bin|jks|keystore|apk|dmg|sha256)$'` 不應有輸出。  
 
 ## 12. 交接時附上的檔案與快照指令
 
-必附：`HANDOFF.md`、`src/index.html`（單一前端來源）。做 Android 或 Tauri 相關工作時加附 6.1 表內的檔案，以及 `tauri.conf.json`、`capabilities/default.json`、`Cargo.toml`、`build.rs`、`lib.rs`、`sync.rs`、`main.rs`、`macos/bio.swift`、`package.json`；改文件時加附 `README.md`。不要附 `target/`、`node_modules/`、建置輸出、圖示、lock 檔、`.git`。  
+必附：`HANDOFF.md`、`src/index.html`（單一前端來源）。做 Android 或 Tauri 相關工作時加附 6.1 表內的檔案，以及 `tauri.conf.json`、`capabilities/default.json`、`Cargo.toml`、`build.rs`、`Info.plist`、`lib.rs`、`sync.rs`、`main.rs`、`src/browser/`、`macos/bio.swift`、`package.json`；做桌面瀏覽器儲存時加附 `browser-extension/`；改文件時加附 `README.md`。不要附 `target/`、`node_modules/`、建置輸出、圖示、lock 檔、`.git`。  
 
-完整快照（工作目錄的現況，含未提交修改）：
+完整快照（工作目錄的現況，含未提交修改）：  
 
 ```
 cd ~/gits/ArgoVault
@@ -329,14 +331,16 @@ tar -czf ~/ArgoVault_min_$(date +%Y%m%d).tar.gz HANDOFF.md README.md src/index.h
 - 2026-11-11：改名 ArgoVault；新增 `reauth` 設定；新增生物辨識解鎖（實機 OK）。  
 - 2026-11-12：桌面名稱（`strings.xml`、`tauri.conf.json`）改為 ArgoVault 並推送；README 與交接文件進倉庫；新增自動填入（方案 A）並成功建置安裝，待實機測試；本文件精簡重寫（移除內嵌程式碼與歷史敘事，改附快照）。  
 
-- 2026-11-13：自動填入實機驗證通過；建議按鈕改自訂版面；編輯前主碼對話框加生物辨識；編輯頁加密碼複製鈕；編輯中切背景不鎖庫（見 9）；三項皆實機通過，自動填入相關檔案首次提交（`a7bee98`）。
+- 2026-11-13：自動填入實機驗證通過；建議按鈕改自訂版面；編輯前主碼對話框加生物辨識；編輯頁加密碼複製鈕；編輯中切背景不鎖庫（見 9）；三項皆實機通過，自動填入相關檔案首次提交（`a7bee98`）。  
 - 2026-11-14：放棄 macOS 自動填入；新增 macOS 生物辨識解鎖（Touch ID 加 Secure Enclave，見 6.6），實機通過。清單頁按返回鍵改為只鎖定、不退出 App（實機 OK，APK 於 macOS 主機建置）。版本改為 0.1.1（`tauri.conf.json`、`Cargo.toml`、`package.json` 與兩個 lock 檔），發佈 GitHub Release `0.1.1`（附 APK 與 arm64 `.dmg`；`.dmg` 建置已驗證，`.deb` 須在 Ubuntu 建置，未附）。  
 - 2026-11-14：新增 Windows 建置說明（7.1）、`.gitattributes`，`.gitignore` 加 `*.msi`、`*.exe`、`*.deb`；新增 Windows Hello 生物辨識解鎖（6.7），Windows 實機建置與測試通過；Windows 自動填入暫緩。  
 - 2026-11-15：匯出備份預設檔名改為 `argovault-<設定檔>-<YYYYMMDD>.bin`，`.sha256` 檔名跟隨實際儲存檔名（見第 3 節；macOS 實機 OK，Android、Windows 未重建、未測）。  
 - 2026-11-15：新增裝置對裝置同步（整檔，SPAKE2 加 AES-256-GCM，見 6.8），Mac 與 Android 17 雙向實機通過；Android 需 `ACCESS_LOCAL_NETWORK` 權限。  
 - 2026-11-15：版本改為 0.2.0，發佈 GitHub Release `0.2.0`（附 APK 與 arm64 `.dmg`；產物只確認建置與簽章，未安裝實測；未附 Windows 安裝檔與 `.deb`）。  
 
-- 2026-11-19：0.3.0 新增 Android 以及桌面 Chrome／Edge 的網站密碼儲存提示。發行附件為 Android arm64-v8a APK 與 Apple Silicon DMG。APK 沿用 0.2.0 的 debug 簽署憑證，版本碼由 2000 升至 3000，已於 Android 14 模擬器覆蓋升級並啟動。DMG 已掛載核對版本、架構、ad-hoc 簽章及內嵌擴充功能。
+- 2026-11-19：0.3.0 新增 Android 以及桌面 Chrome／Edge 的網站密碼儲存提示。發行附件為 Android arm64-v8a APK 與 Apple Silicon DMG。APK 沿用 0.2.0 的 debug 簽署憑證，版本碼由 2000 升至 3000，已於 Android 14 模擬器覆蓋升級並啟動。DMG 已掛載核對版本、架構、ad-hoc 簽章及內嵌擴充功能。  
+
+- 2026-11-21：依程式碼校正本文件：6.7 至 6.9 移回第 6 節並編號；補 `opener` 外掛、`WebsiteSave` 橋接、`#dlgSiteSave` 返回鍵順序、桌面瀏覽器 Rust 模組；第 11 節兩項待辦已完成。  
 
 ## 參考資料
 
