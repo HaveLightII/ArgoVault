@@ -155,7 +155,7 @@ body.af #bGen,body.af #bSet,body.af #bLock,body.af .tabs,body.af #bImpG,body.af 
 
 <section class="vault" id="vault" hidden>
  <aside class="list">
-  <div class="bar"><input id="q" type="search" placeholder="搜尋帳號名稱" aria-label="搜尋"><button class="btn pri" id="bNew">新增</button></div>
+  <div class="bar"><input id="q" type="search" placeholder="搜尋帳號名稱或帳戶類型" aria-label="搜尋"><button class="btn pri" id="bNew">新增</button></div>
   <div class="mbar" id="mbar" hidden><span id="mCnt" data-nt></span><span class="sp"></span><button class="btn mini" id="mAll" data-nt type="button"></button><button class="btn mini dg" id="mDel" type="button">刪除所選</button><button class="btn mini" id="mEnd" type="button">結束</button></div>
   <ul id="ul" data-nt></ul>
   <div class="foot"><span id="cnt" data-nt></span>
@@ -537,7 +537,7 @@ const EN={
 "轉換會以新的隨機 salt 重新加密整個資料庫，主碼不變。轉換前請先匯出備份。":"Conversion re-encrypts the whole database with a new random salt. The master password stays the same. Export a backup first.",
 "重新生成":"Regenerate","鎖定":"Lock","長度：":"Length:","關閉":"Close","驗證":"Verify",
 "設定":"Settings","變更主碼":"Change master password","多選刪除":"Multi-select delete","全選":"Select all","取消全選":"Deselect all","刪除所選":"Delete selected","結束":"Done",
-"字母、數字、底線、連字號、中文":"Letters, digits, underscore, hyphen, CJK characters","搜尋":"Search","搜尋帳號名稱":"Search account name",
+"字母、數字、底線、連字號、中文":"Letters, digits, underscore, hyphen, CJK characters","搜尋":"Search","搜尋帳號名稱或帳戶類型":"Search account name or type",
 "載入設定檔中…":"Loading profiles…",
 "目前主碼":"Current master password","新主碼":"New master password","再次輸入新主碼":"Re-enter new master password","變更":"Change",
 "變更後會以新的隨機 salt 重新加密整個資料庫。主碼遺失將無法復原，請先匯出備份。":"The whole database is re-encrypted with a new random salt. A lost master password cannot be recovered, so export a backup first.",
@@ -844,9 +844,10 @@ function endEdit(){clearTimeout(edT);if(S){S.ed=null;S.mode="view"}}
 function cancelEdit(){const n=S.mode==="new";endEdit();if(n)S.sel=null;render()}
 function select(id){endEdit();stopRev();S.sel=id;render();armIdle()}
 function render(){renderList();renderDetail()}
+const searchHit=q=>r=>r.accountName.toLowerCase().includes(q)||r.accountType.toLowerCase().includes(q);
 function renderList(){
  const q=$("#q").value.trim().toLowerCase(),mu=S.multi;
- const items=S.meta.filter(r=>r.accountName.toLowerCase().includes(q));
+ const items=S.meta.filter(searchHit(q));
  $("#ul").innerHTML=items.length?items.map(r=>`<li><button class="it${S.sel===r.id?" on":""}${mu&&mu.has(r.id)?" sel":""}" data-id="${esc(r.id)}">${mu?`<span class="ck">${mu.has(r.id)?"✓":""}</span>`:""}<i>${esc((r.accountName||"?")[0].toUpperCase())}</i><span><b>${esc(r.accountName||t("（未命名）"))}</b><small>${esc(r.accountType||t("未分類"))}${r.name?"　"+esc(r.name):""}</small></span></button></li>`).join(""):`<li class="empty">${t(S.meta.length?"找不到符合的紀錄":"尚無紀錄，按「新增」建立第一筆")}</li>`;
  $("#cnt").textContent=t("{n} 筆紀錄",{n:S.meta.length});
  $("#mbar").hidden=!mu;
@@ -1207,7 +1208,7 @@ $("#bMulti").onclick=()=>{
 };
 $("#mAll").onclick=()=>{
  if(!S||!S.multi)return;
- const q=$("#q").value.trim().toLowerCase(),ids=S.meta.filter(r=>r.accountName.toLowerCase().includes(q)).map(r=>r.id);
+ const q=$("#q").value.trim().toLowerCase(),ids=S.meta.filter(searchHit(q)).map(r=>r.id);
  const all=ids.length&&ids.every(i=>S.multi.has(i));
  ids.forEach(i=>all?S.multi.delete(i):S.multi.add(i));renderList();
 };

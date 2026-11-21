@@ -22,7 +22,7 @@ ArgoVault（原名 PyPasswords）是原 Python 命令列程式 `PyPasswords.py` 
 ### 功能
 
 - 多設定檔：建立、解鎖、匯入、刪除；每個設定檔各自擁有一組主碼。  
-- 紀錄管理：新增、編輯、單筆刪除、多選刪除、依帳號名稱搜尋；欄位為帳戶類型、帳號名稱、密碼、連結帳戶、姓名、備註（多筆），另有選填的網站網址（自動填入比對用）；編輯頁的密碼欄有複製鈕。  
+- 紀錄管理：新增、編輯、單筆刪除、多選刪除、依帳號名稱或帳戶類型搜尋；欄位為帳戶類型、帳號名稱、密碼、連結帳戶、姓名、備註（多筆），另有選填的網站網址（自動填入比對用）；編輯頁的密碼欄有複製鈕。  
 - 生成密碼：長度 12 至 64，必須同時含小寫、大寫、數字與符號；可選擇是否顯示強度評估。  
 - 備份：匯出加密檔 `.bin` 與雜湊檔 `.sha256`；匯入前顯示檔名、大小、檔頭、偵測到的格式與完整 SHA-256。  
 - 匯入 CSV：欄位為 `帳戶類型,帳號名稱,密碼,連結帳戶,姓名,備註`，備註欄可用 `;` 或 `；` 分隔多筆；可另加選填的 `網址` 欄。  
@@ -117,7 +117,7 @@ Android 版已在三星 arm64 實機測試；macOS 版可建置，但尚未完�
 - JavaScript 無法保證覆寫字串記憶體，只能縮短存留時間。  
 - 刪除用 PIN 只防誤刪與旁人操作，不是存取控制；設定檔不加密。  
 - 解除安裝 App 會清空資料；更換簽章前務必先匯出備份。  
-- 搜尋僅比對帳號名稱；備註尚未支援逐筆編輯。  
+- 備註尚未支援逐筆編輯。  
 - 自動填入：只針對 Chrome；不支援先填帳號、下一頁才填密碼的多步驟登入；不使用公共尾碼清單，網址不要填 `co.uk` 這類；填入的帳號取自「帳號名稱」或「連結帳戶」（設定可選）。  
 
 ### 路線圖
@@ -149,7 +149,7 @@ Opened directly in a browser, data is kept in `localStorage`; inside Tauri it is
 ### Features
 
 - Multiple profiles: create, unlock, import and delete; each profile has its own master password.  
-- Record management: add, edit, delete, multi-select delete, and search by account name. Fields are account type, account name, password, linked account, name and notes (multiple), plus an optional website URL used for autofill matching; the edit page has a copy button for the password.  
+- Record management: add, edit, delete, multi-select delete, and search by account name or account type. Fields are account type, account name, password, linked account, name and notes (multiple), plus an optional website URL used for autofill matching; the edit page has a copy button for the password.  
 - Password generator: length 12 to 64, always containing lowercase, uppercase, digits and symbols; strength rating can be turned off.  
 - Backup: export the encrypted `.bin` plus a `.sha256` file; before importing, the file name, size, header bytes, detected format and full SHA-256 are shown.  
 - CSV import: columns `帳戶類型,帳號名稱,密碼,連結帳戶,姓名,備註` (the Chinese headers are required); the notes column may hold several notes separated by `;` or `；`; an optional `網址` column may be added.  
@@ -244,7 +244,7 @@ The Android build has been tested on a Samsung arm64 device; the macOS build is 
 - JavaScript cannot guarantee that string memory is overwritten; it can only shorten how long secrets stay around.  
 - The deletion PIN only guards against accidental or casual deletion; it is not access control, and the settings file is unencrypted.  
 - Uninstalling the app wipes its data; always export a backup before changing the signing key.  
-- Search matches the account name only; notes cannot yet be edited one by one.  
+- Notes cannot yet be edited one by one.  
 - Autofill: Chrome only; multi-step logins (username on one page, password on the next) are not supported; no public-suffix list is used, so do not enter URLs such as `co.uk`; the username filled comes from the account name or the linked account (selectable in Settings).  
 
 ### Roadmap
