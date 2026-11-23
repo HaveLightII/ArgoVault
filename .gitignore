@@ -3,6 +3,7 @@ node_modules/
 dist/
 .vite/
 *.log
+codex-session*
 
 src-tauri/target/
 src-tauri/gen/schemas/
