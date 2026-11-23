@@ -1062,7 +1062,12 @@ const afHost=u=>{u=String(u||"").trim();if(!u)return"";try{if(!/^[a-z][a-z0-9+.-
 const afMatch=r=>{
  const u=String(r.url||"").trim();
  const q=String(afReq.domain||"").toLowerCase().replace(/^www\./,"");
- if(!q)return !!afReq.pkg&&(!!afReq.cert&&afApps(r).some(a=>a.cert===afReq.cert)||u.toLowerCase()===String(afReq.pkg).toLowerCase());
+ if(!q){
+  if(!afReq.pkg)return false;
+  const links=afApps(r);
+  if(links.length)return !!afReq.cert&&links.some(a=>a.cert===afReq.cert);
+  return u.toLowerCase()===afReq.pkg.toLowerCase();
+ }
  if(!u)return false;
  const h=afHost(u);
  return !!h&&(q===h||q.endsWith("."+h));

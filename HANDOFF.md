@@ -1,6 +1,6 @@
 # ArgoVault 交接文件
 
-最後更新：2026-11-23（目前版本 0.3.1）。原名 PyPasswords（2026-11-11 改名）。本文件不內嵌程式碼，程式以快照檔（第 12 節）一併提供。  
+最後更新：2026-11-23（目前版本 0.3.2）。原名 PyPasswords（2026-11-11 改名）。本文件不內嵌程式碼，程式以快照檔（第 12 節）一併提供。
 
 ## 1. 專案與目前狀態
 
@@ -24,7 +24,7 @@
 | Windows 版 | 建置步驟見 7.1，含 Windows Hello 生物辨識解鎖（6.7）；實機建置與測試 OK（2026-11-14） |
 | Windows 自動填入 | 2026-11-14 決定暫緩（候選：全域快速鍵自動輸入、瀏覽器擴充功能）；Windows Hello 已實機通過，可再議 |
 | 網站密碼儲存提示（Android `SaveInfo`，見 6.5） | SM-T500（Android 12）Chrome 實機 OK（2026-11-19） |
-| 非瀏覽器 App 的自動填入與儲存（見 6.5 末段） | Android 14 模擬器以自製測試 App 驗證：填入、儲存、連結既有紀錄、簽章不符警告 OK；更新密碼確認、編輯頁移除連結、實機未測（2026-11-23） |
+| 非瀏覽器 App 的自動填入與儲存（見 6.5 末段） | SM-T500 實機（Android 12）以原生測試 App 通過新增、更新確認、更新後回填、詳情顯示與移除連結。Chrome 157 通過網站儲存與回填。連結既有紀錄與簽章不符警告亦已在 SM-T500 與 Android 14 模擬器驗證。SM-A1760 與第三方 App 相容性待測（2026-11-23） |
 | 桌面 Chrome／Edge 儲存網站密碼（擴充功能，見 6.9） | macOS Chrome 與 Edge 實測 OK；Windows 僅在 Wine 驗證原生通訊，實機待驗證 |
 
 ## 2. 使用者偏好（需遵守）
@@ -163,7 +163,7 @@ JS `window.__pwBack()` 回傳 `true` 表示已處理；`MainActivity` 以 `OnBac
 
 非瀏覽器 App（2026-11-23，階段一）：密碼欄位沒有 `webDomain` 時走 App 模式，來源以套件名稱加簽署憑證雜湊識別（`ArgoAutofillService.appInfo`），不經 `website()`，前端也不經 `siteOrigin`（非標準協定的 origin 一律是 `"null"`）。  
 
-- 填入：`afMatch` 比對紀錄 `apps` 內的 `pkg` 與 `cert`；套件相同但簽章不同時不列為符合並顯示警告（優先於「顯示所有紀錄」的提示）。舊的「`url` 等於套件名稱」比對保留。  
+- 填入：`afMatch` 比對紀錄 `apps` 內的 `pkg` 與 `cert`；套件相同但簽章不同時不列為符合並顯示警告（優先於「顯示所有紀錄」的提示）。尚未連結該 App 的紀錄仍支援舊的「`url` 等於套件名稱」比對。
 - 儲存（`saveSiteLogin` 的 App 分支）：`apps` 符合且帳號相同則確認後更新密碼；否則若恰有一筆帳號與密碼皆相同的紀錄，詢問是否連結（同套件的舊連結會被取代）；其餘新增一筆（`accountType` 預填 App 名稱）。編輯頁可逐項移除連結。  
 - 需要 `QUERY_ALL_PACKAGES`：實測沒有此權限時查不到來源 App 的簽章，服務就不附 `SaveInfo`。  
 - App 來源的儲存由服務直接 `startActivity` 開主畫面，不回傳 `IntentSender`：測試 App 登入後即 `finish()`，回傳 `IntentSender` 時主畫面沒有被開啟（Android 14 模擬器實測；原因推測是系統經由已結束的畫面啟動，未查證原始碼）。網站來源維持原做法。  
@@ -357,6 +357,10 @@ tar -czf ~/ArgoVault_min_$(date +%Y%m%d).tar.gz HANDOFF.md README.md src/index.h
 - 2026-11-21：版本改為 0.3.1（版本碼 3001），發佈 GitHub Release `0.3.1`（附 arm64 APK 與 Apple Silicon `.dmg`，於 macOS 主機建置；產物只確認版本、架構與簽章，未安裝實測；未附 Windows 安裝檔）。打包 `.dmg` 若出現 `error running bundle_dmg.sh`，先以 `hdiutil info` 檢查並卸載殘留的 `rw.*.dmg` 暫存映像。  
 
 - 2026-11-23：新增非瀏覽器 App 的自動填入比對與儲存（階段一，見 6.5 末段）；紀錄新增選填欄位 `apps`；manifest 加 `QUERY_ALL_PACKAGES`；儲存對話框標題改為「儲存登入密碼」。版本號未變（仍為 0.3.1），未發佈。模擬器測試在「更新密碼確認」前中斷（模擬器前景出現非本次安裝的 `game.engine`，故停止操作）；待辦：補測更新密碼確認、詳情頁顯示與編輯頁移除連結，於 SM-A1760 覆蓋安裝後以真實 App 實測，並重測 Chrome 網站流程未受影響。已建置的 APK 在 `src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-aligned-debugSigned.apk`（debug 金鑰，可覆蓋安裝）。  
+
+- 2026-11-23 實機複測：SM-T500 安裝階段一 APK（SHA-256 `6f8f92ee217312477b8e86368b33174a4dbee920099dcac84ae9d43dc0a6e08d`）。原生測試 App 以空白表單回填並核對更新後的帳密。移除 App 連結後重新驗證主碼，詳情保留紀錄且不再顯示連結。Chrome 157 經 USB 開啟本機 HTTP 登入頁，儲存後重新開啟表單，核對回填帳號與密碼雜湊相符。
+
+- 2026-11-23：0.3.2（Android 版本碼 3002），發行附件為 arm64-v8a APK。本機 uber-apk-signer 1.3.0 簽署，已與 GitHub 0.3.1 APK 比對憑證一致。SM-T500 覆蓋升級後核對 APK 雜湊，確認既有紀錄可解鎖回填。改用不同簽章的同套件測試 App 後，出現警告且該紀錄從預設清單排除。舊套件名稱比對僅適用於尚未連結該 App 的紀錄。
 
 ## 參考資料
 
