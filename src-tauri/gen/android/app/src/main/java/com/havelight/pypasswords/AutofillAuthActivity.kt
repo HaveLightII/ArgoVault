@@ -51,6 +51,8 @@ class AutofillAuthActivity : AppCompatActivity() {
       .put("domain", intent.getStringExtra("domain") ?: "")
       .put("scheme", intent.getStringExtra("scheme") ?: "")
       .put("pkg", intent.getStringExtra("pkg") ?: "")
+      .put("cert", intent.getStringExtra("cert") ?: "")
+      .put("label", intent.getStringExtra("label") ?: "")
 
     web = WebView(this)
     val s = web.settings

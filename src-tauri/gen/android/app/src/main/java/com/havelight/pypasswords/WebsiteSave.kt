@@ -18,12 +18,13 @@ internal object WebsiteSave {
   private var login: JSONObject? = null
   private val expire = Runnable { login = null; ticket = null }
 
-  fun stage(context: Context, url: String, pkg: String, user: String, password: String): Intent {
+  fun stage(context: Context, url: String, pkg: String, user: String, password: String, cert: String, label: String): Intent {
     handler.removeCallbacks(expire)
     val id = UUID.randomUUID().toString()
     ticket = id
     deadline = SystemClock.elapsedRealtime() + TTL
     login = JSONObject().put("url", url).put("pkg", pkg).put("user", user).put("password", password)
+      .put("cert", cert).put("label", label)
     handler.postDelayed(expire, TTL)
     return Intent(context, MainActivity::class.java).putExtra(EXTRA, id)
       .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

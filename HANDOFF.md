@@ -1,6 +1,6 @@
 # ArgoVault 交接文件
 
-最後更新：2026-11-21（目前版本 0.3.1）。原名 PyPasswords（2026-11-11 改名）。本文件不內嵌程式碼，程式以快照檔（第 12 節）一併提供。  
+最後更新：2026-11-23（目前版本 0.3.1）。原名 PyPasswords（2026-11-11 改名）。本文件不內嵌程式碼，程式以快照檔（第 12 節）一併提供。  
 
 ## 1. 專案與目前狀態
 
@@ -24,6 +24,7 @@
 | Windows 版 | 建置步驟見 7.1，含 Windows Hello 生物辨識解鎖（6.7）；實機建置與測試 OK（2026-11-14） |
 | Windows 自動填入 | 2026-11-14 決定暫緩（候選：全域快速鍵自動輸入、瀏覽器擴充功能）；Windows Hello 已實機通過，可再議 |
 | 網站密碼儲存提示（Android `SaveInfo`，見 6.5） | SM-T500（Android 12）Chrome 實機 OK（2026-11-19） |
+| 非瀏覽器 App 的自動填入與儲存（見 6.5 末段） | Android 14 模擬器以自製測試 App 驗證：填入、儲存、連結既有紀錄、簽章不符警告 OK；更新密碼確認、編輯頁移除連結、實機未測（2026-11-23） |
 | 桌面 Chrome／Edge 儲存網站密碼（擴充功能，見 6.9） | macOS Chrome 與 Edge 實測 OK；Windows 僅在 Wine 驗證原生通訊，實機待驗證 |
 
 ## 2. 使用者偏好（需遵守）
@@ -50,7 +51,7 @@
 | PWV2 | `"PWV2"` + `SALT(16)` + `NONCE(12)` + 密文含 tag | PBKDF2-HMAC-SHA256，600000 次，AES-256-GCM |
 | PWV3（預設） | `"PWV3"` + `0x01` + `SALT(16)` + `NONCE(12)` + 密文含 tag | Argon2id（19456 KiB、2 次、1 lane、32 位元組、0x13），AES-256-GCM |
 
-- 明文為 JSON `{"records":[...]}`；紀錄欄位 `id`（`token_hex(4)`）、`accountType`、`accountName`、`password`、`linkedAccount`、`name`、`notes`（字串陣列），另有選填 `url`（網站網址，自動填入比對用；舊資料沒有）。  
+- 明文為 JSON `{"records":[...]}`；紀錄欄位 `id`（`token_hex(4)`）、`accountType`、`accountName`、`password`、`linkedAccount`、`name`、`notes`（字串陣列），另有選填 `url`（網站網址，自動填入比對用；舊資料沒有）與選填 `apps`（已連結的 Android App，陣列，每項 `{pkg, cert, label}`；`cert` 為簽署憑證 SHA-256 十六進位，多重簽署時排序後以逗號相接）。  
 - 空資料庫最小長度：PWV2、PWV3 為 28 位元組（曾誤設 44，導致空庫無法解鎖）。  
 - 備份：匯出預設檔名 `argovault-<設定檔>-<YYYYMMDD>.bin`（本地日期），檢查碼另存 `<實際儲存檔名>.sha256`（使用者在儲存對話框改名時跟著變；仍會跳第二次儲存對話框，因為檔案系統權限只涵蓋對話框選定的路徑。Android 的 content URI 認不出檔名時退回預設名稱）。匯入時若檔名符合 `argovault-<名稱>-<8 位數字>`，建議的設定檔名稱自動還原為 `<名稱>`。CSV 匯入欄位 `帳戶類型,帳號名稱,密碼,連結帳戶,姓名,備註`，另可選 `網址`；含「備註」的欄名皆為備註，單欄以 `;` 或 `；` 分隔。  
 - 密碼生成：長度 12 至 64；英數字加 `!@#$%^&*()-_=+[]{}`；須同時含小寫、大寫、數字、符號。  
@@ -122,7 +123,7 @@
 | 同目錄 `AutofillAuthActivity.kt` | 驗證畫面：純 WebView 載入 `assets/argovault-af.html`；內含 `PwAF` 橋接 |
 | `src/main/res/xml/autofill_service.xml` | 自動填入服務設定 |
 | `src/main/res/layout/autofill_item.xml` | 自動填入建議的 `RemoteViews` 版面（固定深藍底 `#234E70`、白字、App 圖示，不隨系統主題） |
-| `src/main/AndroidManifest.xml` | `INTERNET`、`USE_BIOMETRIC`、`ACCESS_LOCAL_NETWORK` 權限、服務與驗證畫面宣告 |
+| `src/main/AndroidManifest.xml` | `INTERNET`、`USE_BIOMETRIC`、`ACCESS_LOCAL_NETWORK`、`QUERY_ALL_PACKAGES` 權限、服務與驗證畫面宣告 |
 | `build.gradle.kts` | `androidx.biometric:1.1.0`、`androidx.webkit:1.14.0`、`minSdk = 24`、`compileSdk`／`targetSdk = 37`、任務 `syncAutofillAsset`（把 `src/index.html` 複製成 `assets/argovault-af.html`，掛在 `preBuild`） |
 | `proguard-rules.pro` | 保留 `PwBio`、`PwAF` 的 `@JavascriptInterface` 方法 |
 
@@ -159,6 +160,15 @@ JS `window.__pwBack()` 回傳 `true` 表示已處理；`MainActivity` 以 `OnBac
 網站儲存使用 Android `SaveInfo`。使用者同意系統提示後，服務核對同一次請求的欄位 ID、表單與網站，透過一次性票證啟動主畫面。登入資料只傳給主畫面內建來源的 WebView。主程式使用既有的設定檔驗證與加密寫入流程，更新密碼前依網站來源與登入帳號精確比對並要求確認。手動取消、切到背景或逾時會清除待儲存資料。  
 
 2026-11-19 於 SM-T500（Android 12）以 Chrome 提交本機測試表單，實測系統提示、選擇設定檔、主碼驗證、新增、確認更新與解密讀回。網站以 Android 提供的通訊協定與主機識別，本次 Chrome 未提供連接埠。PWV1 至 PWV3 的新增、重複略過、更新確認與取消另以測試資料驗證。  
+
+非瀏覽器 App（2026-11-23，階段一）：密碼欄位沒有 `webDomain` 時走 App 模式，來源以套件名稱加簽署憑證雜湊識別（`ArgoAutofillService.appInfo`），不經 `website()`，前端也不經 `siteOrigin`（非標準協定的 origin 一律是 `"null"`）。  
+
+- 填入：`afMatch` 比對紀錄 `apps` 內的 `pkg` 與 `cert`；套件相同但簽章不同時不列為符合並顯示警告（優先於「顯示所有紀錄」的提示）。舊的「`url` 等於套件名稱」比對保留。  
+- 儲存（`saveSiteLogin` 的 App 分支）：`apps` 符合且帳號相同則確認後更新密碼；否則若恰有一筆帳號與密碼皆相同的紀錄，詢問是否連結（同套件的舊連結會被取代）；其餘新增一筆（`accountType` 預填 App 名稱）。編輯頁可逐項移除連結。  
+- 需要 `QUERY_ALL_PACKAGES`：實測沒有此權限時查不到來源 App 的簽章，服務就不附 `SaveInfo`。  
+- App 來源的儲存由服務直接 `startActivity` 開主畫面，不回傳 `IntentSender`：測試 App 登入後即 `finish()`，回傳 `IntentSender` 時主畫面沒有被開啟（Android 14 模擬器實測；原因推測是系統經由已結束的畫面啟動，未查證原始碼）。網站來源維持原做法。  
+- 系統在填入值未被修改時不跳儲存提示，所以用「顯示所有紀錄」手動選取不會建立連結；待辦（階段二）：選取後留下不含密碼的待辦，主程式下次解鎖時詢問是否連結。階段三：放寬 `isInput`（目前要求 `className` 含 `EditText`，Compose、Flutter 是否符合未測）、多步驟登入。  
+- 測試方式：自製最小 App（兩個 `EditText` 與一個呼叫 `finish()` 的按鈕），以 `aapt2`、`javac`、`d8` 建置；換另一把金鑰重簽後重裝可測簽章不符。主畫面儲存對話框期間 `FLAG_SECURE` 使截圖為空，可用 `uiautomator dump`（需連續執行兩次才會出現 WebView 內容）。  
 
 ### 6.6 macOS 生物辨識解鎖（Touch ID，實機 OK）
 
@@ -345,6 +355,8 @@ tar -czf ~/ArgoVault_min_$(date +%Y%m%d).tar.gz HANDOFF.md README.md src/index.h
 - 2026-11-21：解鎖後的搜尋改為同時比對帳戶類型（清單與多選「全選」共用 `searchHit`）。  
 
 - 2026-11-21：版本改為 0.3.1（版本碼 3001），發佈 GitHub Release `0.3.1`（附 arm64 APK 與 Apple Silicon `.dmg`，於 macOS 主機建置；產物只確認版本、架構與簽章，未安裝實測；未附 Windows 安裝檔）。打包 `.dmg` 若出現 `error running bundle_dmg.sh`，先以 `hdiutil info` 檢查並卸載殘留的 `rw.*.dmg` 暫存映像。  
+
+- 2026-11-23：新增非瀏覽器 App 的自動填入比對與儲存（階段一，見 6.5 末段）；紀錄新增選填欄位 `apps`；manifest 加 `QUERY_ALL_PACKAGES`；儲存對話框標題改為「儲存登入密碼」。版本號未變（仍為 0.3.1），未發佈。模擬器測試在「更新密碼確認」前中斷（模擬器前景出現非本次安裝的 `game.engine`，故停止操作）；待辦：補測更新密碼確認、詳情頁顯示與編輯頁移除連結，於 SM-A1760 覆蓋安裝後以真實 App 實測，並重測 Chrome 網站流程未受影響。已建置的 APK 在 `src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-aligned-debugSigned.apk`（debug 金鑰，可覆蓋安裝）。  
 
 ## 參考資料
 

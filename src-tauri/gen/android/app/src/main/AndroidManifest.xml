@@ -9,6 +9,9 @@
     <!-- 裝置對裝置同步：Android 17 起，連線到區域網路需要此權限（執行期授權） -->
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
 
+    <!-- 自動填入：讀取請求來源 App 的簽署憑證與名稱（Android 11 起預設看不到其他套件） -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+
     <application
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"

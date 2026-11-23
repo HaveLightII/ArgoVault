@@ -168,7 +168,7 @@ body.af #bGen,body.af #bSet,body.af #bLock,body.af .tabs,body.af #bImpG,body.af 
 </main>
 
 <dialog id="dlgSiteSave" aria-labelledby="siteSaveTitle">
- <h3 id="siteSaveTitle">儲存網站密碼</h3>
+ <h3 id="siteSaveTitle">儲存登入密碼</h3>
  <p id="siteSource" class="note" data-nt></p>
  <label for="siteUser">登入帳號</label><input id="siteUser" autocomplete="off">
  <label for="siteProfile">設定檔</label><select id="siteProfile" data-nt></select>
@@ -448,7 +448,17 @@ const EN={
 "連接 Chrome／Edge":"Connect Chrome / Edge",
 "連接後，請在瀏覽器的擴充功能頁開啟開發人員模式，載入所列資料夾，再於 HTTPS 登入頁開啟 ArgoVault 擴充功能並啟用此網站。":"After connecting, enable Developer mode on the browser’s Extensions page, choose Load unpacked and select the folder shown. On an HTTPS login page, open the ArgoVault extension and enable that site.",
 "無法連接瀏覽器，請確認 App 安裝位置與使用者目錄權限。":"Could not connect the browser. Check the app location and user directory permissions.",
-"儲存網站密碼":"Save website password",
+"儲存登入密碼":"Save login password",
+"App：{label}（{pkg}）":"App: {label} ({pkg})",
+"{label}（{pkg}）":"{label} ({pkg})",
+"已連結的 App":"Linked apps",
+"移除":"Remove",
+"有多筆紀錄符合此 App 與帳號，請在保管庫選擇要更新的紀錄。":"Several records match this app and username. Choose the record to update in the vault.",
+"要更新「{profile}」內 {label} 的帳號「{user}」密碼嗎？":"Update the password for “{user}” in {label} in profile “{profile}”?",
+"「{profile}」已有相同帳號與密碼的紀錄「{rec}」。要把 {label} 連結到該紀錄嗎？選「否」會另存一筆新紀錄。":"Profile “{profile}” already has a record “{rec}” with the same username and password. Link {label} to it? Choose No to save a separate record.",
+"已連結 App":"App linked",
+"此 App 的簽章與連結時不同，可能不是同一個 App，請勿填入，除非你確定它來自可信來源。":"This app’s signing certificate differs from when it was linked. It may not be the same app. Do not fill unless you are sure it comes from a trusted source.",
+"沒有符合此 App 的紀錄。可按「顯示所有紀錄」手動選擇；在 App 登入後依系統提示儲存，即可連結。":"No record matches this app. Tap Show all records to choose manually. To link it, sign in to the app and accept the system save prompt.",
 "登入帳號":"Login username",
 "使用生物辨識儲存":"Save with biometrics",
 "請確認 {pkg} 提供的網站為 {url}":"Check the website reported by {pkg}: {url}",
@@ -731,6 +741,7 @@ const askYesNo=m=>askDlg(m,false);
 const askText=m=>askDlg(m,true);
 const askPin=m=>askDlg(m,true,"pin");
 const rawVault=()=>storeGet(S.profile);
+const appNames=r=>(Array.isArray(r.apps)?r.apps:[]).map(a=>a.label||a.pkg).join("、");
 const metaOf=r=>r.map(x=>({id:x.id,accountType:x.accountType||"",accountName:x.accountName||"",name:x.name||""}));
 
 /* ---------- 刪除用 PIN ---------- */
@@ -866,7 +877,7 @@ function renderDetail(){
  if(!rv){$("#dt").innerHTML=head+`<dl style="margin:0">${row("帳號名稱",m.accountName,0)}${row("姓名",m.name,0)}</dl>
   <div class="lockbox"><b>${t("密碼與詳細資料已加密")}</b><p>${t("查看前需要再次輸入主碼，顯示 {n} 秒後自動隱藏。",{n:cfg.rev})}</p>
   <div class="fa"><button class="btn pri" data-a="rev">${t("查看密碼")}</button><button class="btn" data-a="edit">${t("編輯")}</button><span class="sp"></span><button class="btn dg" data-a="del">${t("刪除")}</button></div></div>`;return}
- $("#dt").innerHTML=head+`<dl style="margin:0">${row("帳號名稱",rv.accountName,1)}${row("網站網址",rv.url,0)}
+ $("#dt").innerHTML=head+`<dl style="margin:0">${row("帳號名稱",rv.accountName,1)}${row("網站網址",rv.url,0)}${row("已連結的 App",appNames(rv),0)}
  <div class="row pw"><dt>${t("密碼")}</dt><dd><div class="keys mask" id="pwv">••••••••••••</div>${meter(rv.password||"")}</dd><span style="display:flex;gap:6px"><button class="btn mini" data-a="show">${t("顯示")}</button><button class="btn mini" data-a="cpw">${t("複製")}</button></span></div>
  ${row("連結帳戶",rv.linkedAccount,1)}${row("姓名",rv.name,0)}
  ${(rv.notes||[]).length?`<div class="row"><dt>${t("備註")}</dt><dd><ul class="notes" style="max-height:none">${rv.notes.map(n=>`<li>${esc(n)}</li>`).join("")}</ul></dd><span></span></div>`:""}</dl>
@@ -880,6 +891,7 @@ function renderEdit(){
  ${f("accountType","帳戶類型")}${f("accountName","帳號名稱")}${f("url","網站網址（自動填入用，選填）")}
  <label for="e_password">${t("密碼")}</label><div class="pwl"><input id="e_password" type="password" value="${esc(r.password||"")}" autocomplete="off" enterkeyhint="next" style="font-family:var(--mono)"><button class="btn" data-a="eye">${t("顯示")}</button><button class="btn" data-a="cpe">${t("複製")}</button><button class="btn" data-a="gen">${t("生成")}</button></div><div id="eMeter">${meter(r.password||"")}</div>
  ${f("linkedAccount","連結帳戶")}${f("name","姓名")}
+ ${Array.isArray(r.apps)&&r.apps.length?`<label>${t("已連結的 App")}</label>`+r.apps.map((a,i)=>`<div class="pwl" data-app="${i}"><input value="${esc(t("{label}（{pkg}）",{label:a.label||"",pkg:a.pkg}))}" readonly><button class="btn" data-a="unapp">${t("移除")}</button></div>`).join(""):""}
  <label for="e_notes">${t("備註（每行一筆）")}</label><textarea id="e_notes">${esc((r.notes||[]).join("\n"))}</textarea>
  <div class="fa"><button class="btn pri" data-a="save">${t("儲存")}</button><button class="btn" data-a="cancel">${t("取消")}</button></div>`;
 }
@@ -963,7 +975,7 @@ function presentSiteSave(req){
   return toast(names.length?"請先完成目前的操作，再重新提交網站表單。":"請先建立設定檔，再重新提交網站表單。",1);
  }
  siteRequest=req;
- $("#siteSource").textContent=req.pkg?t("請確認 {pkg} 提供的網站為 {url}",req):t("網站：{url}",req);
+ $("#siteSource").textContent=req.cert?t("App：{label}（{pkg}）",req):req.pkg?t("請確認 {pkg} 提供的網站為 {url}",req):t("網站：{url}",req);
  $("#siteUser").value=req.user;
  $("#siteProfile").replaceChildren(...names.map(name=>new Option(name,name)));
  $("#siteProfile").value=S?.profile||$("#uSel").value||names[0];
@@ -971,6 +983,7 @@ function presentSiteSave(req){
  siteDialog.showModal();
  siteTimer=setTimeout(()=>{if(!req.writing){closeSiteSave();toast("儲存請求已失效，請重新提交網站表單。",1)}},90000);
 }
+const appHit=(r,app)=>Array.isArray(r.apps)&&r.apps.some(a=>a.pkg===app.pkg&&a.cert===app.cert);
 function siteOrigin(url){
  if(!url)return "";
  try{return new URL(url.includes("://")?url:"https://"+url).origin}catch{return ""}
@@ -995,19 +1008,29 @@ async function saveSiteLogin(withBio){
   const raw=storeGet(name);
   opened=await openVault(raw,pw);pw.fill(0);
   if(siteRequest!==req)return;
-  const origin=siteOrigin(req.url);
-  const matches=opened.recs.filter(r=>origin&&siteOrigin(r.url)===origin&&(r[cfg.afUser]||r.accountName)===user);
+  // App 來源以套件名稱加簽章識別，不可經 siteOrigin（非標準協定的 origin 一律是 "null"）。
+  const origin=req.cert?"":siteOrigin(req.url),app=req.cert?{pkg:req.pkg,cert:req.cert,label:req.label||req.pkg}:null;
+  const userOf=r=>(r[cfg.afUser]||r.accountName)===user;
+  const confirm=async m=>{req.confirming=true;const yes=await askYesNo(m);req.confirming=false;return yes};
+  const matches=opened.recs.filter(r=>(app?appHit(r,app):origin&&siteOrigin(r.url)===origin)&&userOf(r));
   if(matches.some(r=>r.password===req.password)){closeSiteSave();toast("此帳號與密碼已儲存");return}
-  if(matches.length>1)throw new Error("有多筆紀錄符合此網站與帳號，請在保管庫選擇要更新的紀錄。");
+  if(matches.length>1)throw new Error(app?"有多筆紀錄符合此 App 與帳號，請在保管庫選擇要更新的紀錄。":"有多筆紀錄符合此網站與帳號，請在保管庫選擇要更新的紀錄。");
+  let done="已加密儲存";
   if(matches.length){
-   req.confirming=true;
-   const yes=await askYesNo(t("要更新「{profile}」內 {url} 的帳號「{user}」密碼嗎？",{profile:name,url:req.url,user}));
-   req.confirming=false;
+   const yes=await confirm(app?t("要更新「{profile}」內 {label} 的帳號「{user}」密碼嗎？",{profile:name,label:app.label,user}):t("要更新「{profile}」內 {url} 的帳號「{user}」密碼嗎？",{profile:name,url:req.url,user}));
    if(siteRequest!==req)return;
    if(!yes){closeSiteSave();return}
    matches[0].password=req.password;
   }else{
-   opened.recs.push({id:hex(rb(4)),accountType:"",accountName:user,linkedAccount:cfg.afUser==="linkedAccount"?user:"",name:"",notes:[],url:req.url,password:req.password});
+   // 同帳號同密碼的既有紀錄（例如網站版）：詢問是否連結，避免重複。
+   const same=app?opened.recs.filter(r=>userOf(r)&&r.password===req.password):[];
+   let link=false;
+   if(same.length===1){
+    link=await confirm(t("「{profile}」已有相同帳號與密碼的紀錄「{rec}」。要把 {label} 連結到該紀錄嗎？選「否」會另存一筆新紀錄。",{profile:name,rec:same[0].accountName,label:app.label}));
+    if(siteRequest!==req)return;
+   }
+   if(link){same[0].apps=[...(Array.isArray(same[0].apps)?same[0].apps:[]).filter(a=>a.pkg!==app.pkg),app];done="已連結 App"}
+   else opened.recs.push({id:hex(rb(4)),accountType:app?app.label:"",accountName:user,linkedAccount:cfg.afUser==="linkedAccount"?user:"",name:"",notes:[],url:app?"":req.url,...(app?{apps:[app]}:{}),password:req.password});
   }
   status.textContent=t("加密儲存中…");
   const bytes=await seal(opened.fmt,opened.salt,opened.keys,opened.recs);
@@ -1016,7 +1039,7 @@ async function saveSiteLogin(withBio){
   req.writing=true;$("#siteCancel").disabled=true;
   await storePut(name,bytes);
   if(S?.profile===name){stopRev();S.meta=metaOf(opened.recs);render()}
-  closeSiteSave();toast("已加密儲存");
+  closeSiteSave();toast(done);
  }catch(e){if(siteRequest===req)status.textContent=t(e.message)}
  finally{
   drop(opened);pw.fill(0);
@@ -1034,22 +1057,25 @@ addEventListener("pagehide",closeSiteSave);
 
 /* ---------- 自動填入（僅 AutofillAuthActivity 的 WebView，window.PwAF 存在時啟用） ---------- */
 const afReq=(()=>{try{return afApi?JSON.parse(afApi.request()):null}catch{return null}})()||{domain:"",pkg:""};
+const afApps=r=>Array.isArray(r.apps)?r.apps.filter(a=>a.pkg===afReq.pkg):[];
 const afHost=u=>{u=String(u||"").trim();if(!u)return"";try{if(!/^[a-z][a-z0-9+.-]*:\/\//i.test(u))u="https://"+u;return new URL(u).hostname.toLowerCase().replace(/^www\./,"")}catch{return""}};
 const afMatch=r=>{
- const u=String(r.url||"").trim();if(!u)return false;
+ const u=String(r.url||"").trim();
  const q=String(afReq.domain||"").toLowerCase().replace(/^www\./,"");
- if(!q)return !!afReq.pkg&&u.toLowerCase()===String(afReq.pkg).toLowerCase();
+ if(!q)return !!afReq.pkg&&(!!afReq.cert&&afApps(r).some(a=>a.cert===afReq.cert)||u.toLowerCase()===String(afReq.pkg).toLowerCase());
+ if(!u)return false;
  const h=afHost(u);
  return !!h&&(q===h||q.endsWith("."+h));
 };
 let afRecs=[],afAll=false,afShown=[],afTimer=null;
 function afDraw(){
- const src=afReq.domain||afReq.pkg||"";
+ const src=afReq.domain||(afReq.label?t("{label}（{pkg}）",afReq):afReq.pkg)||"";
+ const forged=!afReq.domain&&afRecs.some(r=>afApps(r).length&&!afMatch(r));
  $("#afSrc").textContent=src?t("請求來源：{s}",{s:src}):t("無法取得請求來源");
  afShown=afRecs.filter(r=>afAll||afMatch(r));
  $("#afUl").innerHTML=afShown.map((r,i)=>`<li><button class="btn full afit" data-i="${i}" type="button">${esc(r.accountName||t("（未命名）"))}<small>${esc(r.linkedAccount||r.name||afHost(r.url)||"")}</small></button></li>`).join("");
  const w=$("#afWarn");
- w.textContent=afAll?t("目前顯示所有紀錄，請確認請求來源是你要登入的網站或 App 再選擇。"):afShown.length?"":t("沒有符合此來源的紀錄。請在主程式為該紀錄填寫「網站網址」，或按「顯示所有紀錄」手動選擇。");
+ w.textContent=forged?t("此 App 的簽章與連結時不同，可能不是同一個 App，請勿填入，除非你確定它來自可信來源。"):afAll?t("目前顯示所有紀錄，請確認請求來源是你要登入的網站或 App 再選擇。"):afShown.length?"":t(afReq.domain?"沒有符合此來源的紀錄。請在主程式為該紀錄填寫「網站網址」，或按「顯示所有紀錄」手動選擇。":"沒有符合此 App 的紀錄。可按「顯示所有紀錄」手動選擇；在 App 登入後依系統提示儲存，即可連結。");
  w.hidden=!w.textContent;
  $("#afAll").textContent=t(afAll?"只顯示符合的紀錄":"顯示所有紀錄");
 }
@@ -1168,12 +1194,14 @@ $("#dt").onclick=async e=>{
   stopRev();S.mode="edit";S.ed={fmt:o.fmt,salt:o.salt,keys:o.keys,rec:{...rec,notes:[...(rec.notes||[])]}};o.recs=null;armEd();render();
  }
  else if(a==="cancel")cancelEdit();
+ else if(a==="unapp")b.closest("[data-app]").remove();
  else if(a==="cpe")copy($("#e_password").value);
  else if(a==="eye"){const i=$("#e_password"),h=i.type==="password";i.type=h?"text":"password";b.textContent=t(h?"隱藏":"顯示")}
  else if(a==="gen"){$("#e_password").value=generatePassword(cfg.len);$("#e_password").dispatchEvent(new Event("input",{bubbles:true}))}
  else if(a==="save"){
   const E=S.ed,g=k=>$("#e_"+k).value.trim();
   const rec={...E.rec,id:E.rec.id||hex(rb(4)),accountType:g("accountType"),accountName:g("accountName"),url:g("url"),linkedAccount:g("linkedAccount"),name:g("name"),password:$("#e_password").value,notes:$("#e_notes").value.split("\n").map(s=>s.trim()).filter(Boolean)};
+  if(Array.isArray(E.rec.apps)){rec.apps=[...$("#dt").querySelectorAll("[data-app]")].map(e=>E.rec.apps[+e.dataset.app]);if(!rec.apps.length)delete rec.apps}
   if(!rec.accountName)return toast("帳號名稱不可為空",1);
   const ok=await work(t("加密儲存中…"),async()=>{
    const recs=await unseal(E.fmt,E.keys,hdr(rawVault()).body);
