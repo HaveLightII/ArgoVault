@@ -15,6 +15,8 @@ An offline, multi-profile password manager: a single-file HTML frontend packaged
 
 ### 簡介
 
+Android 0.3.2 提供 arm64-v8a APK，可從 0.3.1 保留資料覆蓋升級。[下載與發行說明](https://github.com/HaveLightII/ArgoVault/releases/tag/0.3.2)
+
 ArgoVault（原名 PyPasswords）是原 Python 命令列程式 `PyPasswords.py` 的 HTML 重寫版。所有資料只存在本機，以主碼加密；前端是單一檔案 `src/index.html`，使用原生 JavaScript，沒有任何外部相依，程式碼中也沒有網路請求（`fetch`、`XMLHttpRequest`、`WebSocket`）。  
 
 在瀏覽器直接開啟時，資料存於 `localStorage`；在 Tauri 內執行時，資料存於 App 私有資料目錄，兩種模式依 `window.__TAURI__` 自動切換。  
@@ -30,6 +32,7 @@ ArgoVault（原名 PyPasswords）是原 Python 命令列程式 `PyPasswords.py` 
 - 生物辨識解鎖（僅 Android，選用）：每個設定檔可在「更多」啟用，之後解鎖頁出現生物辨識按鈕；主碼永遠可用；查看、新增、編輯、刪除等需再輸入主碼的對話框也可用生物辨識驗證。  
 - 瀏覽器自動填入（僅 Android，選用）：在系統設定選 ArgoVault 為自動填入服務後，於 Chrome 登入頁點欄位即出現建議，解鎖（主碼或生物辨識）後只列出網址符合的紀錄，點選即填入；每次填入都要解鎖，填入操作只讀取資料庫。
 - 網站密碼儲存（Android 8 以上）：先建立 ArgoVault 設定檔，在 Android 選 ArgoVault 為自動填入服務，並在 Chrome 的自動填入服務設定選擇其他服務。提交支援的網站登入表單時，點系統的「儲存」，在 App 核對來源與帳號、選擇設定檔，以主碼或已啟用的生物辨識驗證。同一網站與帳號的密碼變更時會再詢問是否更新。
+- Android 原生 App 登入（Android 8 以上）：將 ArgoVault 設為系統自動填入服務。在支援的登入表單送出帳密後，點系統的「儲存」，核對 App 與帳號，再驗證設定檔。若恰有一筆相同帳密，可連結既有紀錄；同一 App 與帳號的密碼變更時，會先詢問是否更新。下次登入可解鎖回填。詳情頁可查看已連結的 App，編輯頁可移除連結。
 - 介面語言：繁體中文、English、跟隨系統。  
 - 設定集中於「設定」對話框，見下方「設定項目」。  
 
@@ -53,7 +56,8 @@ ArgoVault（原名 PyPasswords）是原 Python 命令列程式 `PyPasswords.py` 
 - 刪除用 PIN（選用）：刪除資料庫、單筆刪除、多選刪除時須輸入；PIN 以 PBKDF2-SHA256 雜湊儲存。  
 - 禁止截圖與螢幕錄影（僅 Android，選用）。  
 - 生物辨識解鎖（僅 Android，選用）：主碼以需要強生物辨識（Class 3）的 Android Keystore 金鑰加密後存放；新增指紋會使其失效，主碼變更時自動重新註冊或停用。便利功能，強度低於主碼。  
-- 自動填入（僅 Android，選用）：鎖定時不洩漏任何帳號，只提供需驗證的建議；網域須等於紀錄網址的主機或其子網域才列入預設清單（`evil-example.com` 不符合 `example.com`），其他紀錄須手動展開並顯示警告；切到背景或閒置 90 秒即取消。  
+- 自動填入（僅 Android，選用）：鎖定時不洩漏任何帳號，只提供需驗證的建議；網站的請求網域須等於紀錄網址的主機或其子網域才列入預設清單（`evil-example.com` 不符合 `example.com`），其他紀錄須手動展開並顯示警告；切到背景或閒置 90 秒即取消。
+- 原生 App 回填時會核對已連結 App 的套件名稱與簽署憑證。簽章不同時會顯示警告，並從預設清單排除該紀錄。
 - 編輯中切到背景不會取消編輯或鎖定，但密碼欄會改回遮罩，逾 5 分鐘才取消編輯。  
 - 全頁禁止選取文字，密碼只能用複製鈕取得；複製後可選擇是否提醒清除剪貼簿。  
 
@@ -118,7 +122,7 @@ Android 版已在三星 arm64 實機測試；macOS 版可建置，但尚未完�
 - 刪除用 PIN 只防誤刪與旁人操作，不是存取控制；設定檔不加密。  
 - 解除安裝 App 會清空資料；更換簽章前務必先匯出備份。  
 - 備註尚未支援逐筆編輯。  
-- 自動填入：只針對 Chrome；不支援先填帳號、下一頁才填密碼的多步驟登入；不使用公共尾碼清單，網址不要填 `co.uk` 這類；填入的帳號取自「帳號名稱」或「連結帳戶」（設定可選）。  
+- 自動填入：已在 SM-T500（Android 12）以原生測試 App 與 Chrome 157 驗證。第三方 App 的相容性取決於登入欄位是否支援 Android 自動填入；不支援先填帳號、下一頁才填密碼的多步驟登入；不使用公共尾碼清單，網址不要填 `co.uk` 這類；填入的帳號取自「帳號名稱」或「連結帳戶」（設定可選）。
 
 ### 路線圖
 
@@ -142,6 +146,8 @@ GPL-3.0 license
 
 ### Overview
 
+The Android 0.3.2 release includes an arm64-v8a APK that can be installed over 0.3.1 while keeping existing profiles. [Download and release notes](https://github.com/HaveLightII/ArgoVault/releases/tag/0.3.2)
+
 ArgoVault (formerly PyPasswords) is an HTML rewrite of the original Python command-line tool `PyPasswords.py`. All data stays on the device and is encrypted with a master password. The frontend is a single file, `src/index.html`, written in vanilla JavaScript with no external dependencies and no network requests (`fetch`, `XMLHttpRequest`, `WebSocket`).  
 
 Opened directly in a browser, data is kept in `localStorage`; inside Tauri it is stored in the app's private data directory. The mode is chosen automatically by checking `window.__TAURI__`.  
@@ -157,6 +163,7 @@ Opened directly in a browser, data is kept in `localStorage`; inside Tauri it is
 - Biometric unlock (Android only, optional): enable it per profile under More; the unlock screen then shows a biometric button. The master password always works; the re-authentication dialogs (viewing, adding, editing, deleting and so on) also accept biometric verification.  
 - Browser autofill (Android only, optional): after choosing ArgoVault as the autofill service in system settings, tapping a field on a Chrome login page shows a suggestion; after unlocking (master password or biometrics) only records whose URL matches are listed, and one tap fills the fields. Every fill requires unlocking.
 - Save website passwords (Android 8+). Create a profile, select ArgoVault as the Android autofill service, and enable autofill using another service in Chrome. After submitting a supported login form, tap the system save prompt. Review the source and username, select a profile, and authenticate with the master password or enrolled biometrics. Updating an existing login requires confirmation.
+- Android app logins (Android 8+). Select ArgoVault as the system autofill service. After submitting a supported login form, tap **Save**, check the app and username, and authenticate to the profile. If exactly one record has the same credentials, you can link it. ArgoVault asks before updating a changed password for the same app and username. Unlock to fill the next login. View linked apps in the record details and remove links in the editor.
 - UI language: Traditional Chinese, English, or follow the system.  
 - Preferences are collected in one Settings dialog (see "Settings" below).  
 
@@ -180,7 +187,8 @@ The plaintext is JSON: `{"records":[...]}`. Argon2id is a hand-written JavaScrip
 - Optional deletion PIN: required to delete a database, a single record or multiple records; stored as a PBKDF2-SHA256 hash.  
 - Optional screenshot and screen-recording block (Android only).  
 - Optional biometric unlock (Android only): the master password is encrypted with an Android Keystore key that requires a strong (Class 3) biometric; enrolling a new fingerprint invalidates it, and changing the master password re-enrolls or disables it. A convenience feature, weaker than the master password.  
-- Autofill (Android only, optional): while locked it exposes no accounts, only an authentication-required suggestion; the request domain must equal the record URL host or be a subdomain of it (`evil-example.com` does not match `example.com`), other records must be revealed manually with a warning; it is cancelled when the app goes to the background or after 90 seconds idle.  
+- Autofill (Android only, optional): while locked it exposes no accounts, only an authentication-required suggestion; for websites, the request domain must equal the record URL host or be a subdomain of it (`evil-example.com` does not match `example.com`), other records must be revealed manually with a warning; it is cancelled when the app goes to the background or after 90 seconds idle.
+- For native app autofill, ArgoVault checks the linked app’s package name and signing certificate. A certificate mismatch displays a warning and excludes the record from the default list.
 - Going to the background while editing neither cancels the edit nor locks the vault, but the password field is masked again and the edit is cancelled after 5 minutes.  
 - Text selection is disabled across the page, so passwords can only be taken with the copy button; a clipboard-cleanup reminder after copying is optional.  
 
@@ -245,7 +253,7 @@ The Android build has been tested on a Samsung arm64 device; the macOS build is 
 - The deletion PIN only guards against accidental or casual deletion; it is not access control, and the settings file is unencrypted.  
 - Uninstalling the app wipes its data; always export a backup before changing the signing key.  
 - Notes cannot yet be edited one by one.  
-- Autofill: Chrome only; multi-step logins (username on one page, password on the next) are not supported; no public-suffix list is used, so do not enter URLs such as `co.uk`; the username filled comes from the account name or the linked account (selectable in Settings).  
+- Autofill was verified on a Samsung SM-T500 (Android 12) with a native test app and Chrome 157. Compatibility with other apps depends on their login fields supporting Android autofill. Multi-step logins (username on one page, password on the next) are not supported; no public-suffix list is used, so do not enter URLs such as `co.uk`; the username filled comes from the account name or the linked account (selectable in Settings).
 
 ### Roadmap
 

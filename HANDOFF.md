@@ -107,7 +107,7 @@
 - `authOpen(reason, soft)`：`soft` 為真（只有查看密碼）、`reauth` 為假且 `S.ses` 與檔頭 `fmt`、`salt` 相符時，直接 `unseal`，否則退回詢問主碼；成功後若 `reauth` 為假就快取金鑰。  
 - `ask(reason, bio)`：`bio` 為真且該設定檔已註冊生物辨識時，`#dlgAuth` 顯示「生物辨識驗證」鈕，成功即以主碼位元組走原流程；只有 `authOpen` 傳 `true`（查看、新增、編輯、刪除、匯入 CSV 皆可用，啟用生物辨識與變更主碼不用）。失敗訊息顯示在對話框內 `#aErr`（對話框在 top layer，`toast` 會被蓋住）；驗證後主碼無法開庫則停用註冊。  
 - 解鎖流程為 `doUnlock(name, pw, fromBio)`（主碼與生物辨識共用）；生物辨識解鎖後無法開庫（主碼已變）會自動停用該設定檔的註冊。  
-- 橋接物件（不存在時相關按鈕隱藏）：`window.PwBio`（生物辨識與自動填入設定；Android 為原生橋接，macOS 與 Windows Tauri 為前端 shim，見 6.6、6.7）、`window.WebsiteSave`（僅 Android，`MainActivity` 以 `WebViewCompat.addWebMessageListener` 掛上，傳遞待儲存的網站登入資料，前端對話框 `#dlgSiteSave`）、`window.PwAF`（僅 Android）（自動填入模式，`body.af`，只讀，解鎖後 `afList` 顯示比對清單，不建立 `S`）。  
+- 橋接物件（不存在時相關按鈕隱藏）：`window.PwBio`（生物辨識與自動填入設定；Android 為原生橋接，macOS 與 Windows Tauri 為前端 shim，見 6.6、6.7）、`window.WebsiteSave`（僅 Android，`MainActivity` 以 `WebViewCompat.addWebMessageListener` 掛上，傳遞待儲存的網站或原生 App 登入資料，前端對話框 `#dlgSiteSave`）、`window.PwAF`（僅 Android）（自動填入模式，`body.af`，只讀，解鎖後 `afList` 顯示比對清單，不建立 `S`）。
 - 過去的陷阱：`lock()` 內不可引用不存在的元素 ID；鍵盤 `onkeydown` 對非 Enter 鍵不可 `return false`（會擋住倒退刪字）；`unseal` 最小長度 28。  
 
 ## 6. 平台整合（6.1 至 6.5 為 Android，6.6 起為桌面與跨平台）
@@ -144,13 +144,13 @@ JS `window.__pwBack()` 回傳 `true` 表示已處理；`MainActivity` 以 `OnBac
 - 包裝主碼而非衍生金鑰：轉換格式與重新加鹽不會使其失效。主碼變更後前端以新主碼重新註冊（取消則停用）；新增指紋、密文遺失、解密後無法開庫都會清除註冊並提示。建立同名、匯入覆蓋、刪除設定檔也清除。  
 - 回傳協定：`window.__pwBioDone(id, code, data)`；`code` 為 `ok`、`cancel`、`lockout`、`missing`、`invalidated`、`error`。只接受 `BIOMETRIC_STRONG`（許多裝置的臉部辨識只屬 Class 2，不符）；主碼的 base64 字串會短暫存在於 JS 堆積。威脅模型：便利功能，強度低於主碼（Android Developers, n.d.-a）。  
 
-### 6.5 瀏覽器自動填入（實機 OK）
+### 6.5 Android 自動填入（Chrome 與原生 App）
 
 流程：Chrome 登入頁點欄位 → 系統顯示「ArgoVault」建議 → `AutofillAuthActivity` 解鎖（主碼或指紋）→ 顯示網址符合的紀錄 → 點選後回傳 `Dataset`，欄位被填入。  
 
 - 鎖定時 `ArgoAutofillService` 不洩漏任何帳號，只回傳一個 `setAuthentication` 的 `Dataset`（欄位值為 `null`）；請求來自本 App 自己的畫面時略過；找不到密碼欄位時不回應；帳號欄位取密碼欄位前最近的文字欄位（優先看 `autofillHints` 與 HTML `type=email`）。  
 - `AutofillAuthActivity`：`FLAG_SECURE`、禁止導覽、`WebViewAssetLoader` 載入 `https://appassets.androidplatform.net/assets/argovault-af.html`，同時掛 `PwAF` 與 `PwBio`；`PwAF` 提供 `request()`、`profiles()`、`read(name, ext)`（只讀 `<dataDir>/vault/<name>.bin` 或 `.bin.bak`，拒絕含路徑字元的名稱）、`settings()`、`fill()`、`cancel()`。  
-- 比對（`afMatch`）：請求網域去掉 `www.` 後等於紀錄網址的主機，或為其子網域；`evil-example.com` 不符合 `example.com`。無網域（非瀏覽器）時，只在紀錄網址等於套件名稱時符合。沒有符合項目時須按「顯示所有紀錄」手動選，並顯示警告。不使用公共尾碼清單，網址不要填 `co.uk` 這類。  
+- 比對（`afMatch`）：請求網域去掉 `www.` 後等於紀錄網址的主機，或為其子網域；`evil-example.com` 不符合 `example.com`。無網域時依下方的 App 套件名稱、簽章與舊資料相容規則比對。沒有符合項目時須按「顯示所有紀錄」手動選，並顯示警告。不使用公共尾碼清單，網址不要填 `co.uk` 這類。
 - 建議按鈕不可用 `android.R.layout.simple_list_item_1`：文字色來自深色主題而下拉底色為白，呈現空白方塊（實機截圖證實）；現用自訂版面 `autofill_item`，副標依系統語言（`zh` 或英文）。  
 - 切到背景或閒置 90 秒即取消；每次填入都要解鎖；不寫入 vault。  
 - 使用者端設定：系統設定選 ArgoVault 為自動填入服務（設定頁有捷徑）；Chrome 設定的「自動填入服務」選「使用其他服務自動填入」（Android Developers Blog, 2024）。  
@@ -360,7 +360,7 @@ tar -czf ~/ArgoVault_min_$(date +%Y%m%d).tar.gz HANDOFF.md README.md src/index.h
 
 - 2026-11-23 實機複測：SM-T500 安裝階段一 APK（SHA-256 `6f8f92ee217312477b8e86368b33174a4dbee920099dcac84ae9d43dc0a6e08d`）。原生測試 App 以空白表單回填並核對更新後的帳密。移除 App 連結後重新驗證主碼，詳情保留紀錄且不再顯示連結。Chrome 157 經 USB 開啟本機 HTTP 登入頁，儲存後重新開啟表單，核對回填帳號與密碼雜湊相符。
 
-- 2026-11-23：0.3.2（Android 版本碼 3002），發行附件為 arm64-v8a APK。本機 uber-apk-signer 1.3.0 簽署，已與 GitHub 0.3.1 APK 比對憑證一致。SM-T500 覆蓋升級後核對 APK 雜湊，確認既有紀錄可解鎖回填。改用不同簽章的同套件測試 App 後，出現警告且該紀錄從預設清單排除。舊套件名稱比對僅適用於尚未連結該 App 的紀錄。
+- 2026-11-23：0.3.2（Android 版本碼 3002），已公開發佈 [GitHub Release 0.3.2](https://github.com/HaveLightII/ArgoVault/releases/tag/0.3.2)。附件為 arm64-v8a APK，SHA-256 為 `5290190791985a52011fbf18f580eac73f716fa63eade007195c61c2b0bebb5a`。本機 uber-apk-signer 1.3.0 簽署，已與 GitHub 0.3.1 APK 比對憑證一致。SM-T500 覆蓋升級後核對 APK 雜湊，確認既有紀錄可解鎖回填。改用不同簽章的同套件測試 App 後，出現警告且該紀錄從預設清單排除。舊套件名稱比對僅適用於尚未連結該 App 的紀錄。
 
 ## 參考資料
 
